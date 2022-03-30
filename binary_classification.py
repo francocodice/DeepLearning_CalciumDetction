@@ -53,6 +53,7 @@ if __name__ == '__main__':
     path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/final.pt'
 
+    # test git
     transform = transforms.Compose([ transforms.Resize(2048),
                                      transforms.CenterCrop(1800),
                                      transforms.Resize(1024),
