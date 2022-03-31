@@ -53,7 +53,6 @@ if __name__ == '__main__':
     path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    # test git
     transform = transforms.Compose([ transforms.Resize(2048),
                                      transforms.CenterCrop(1800),
                                      transforms.Resize(1024),
@@ -67,12 +66,14 @@ if __name__ == '__main__':
     model = load_densenet(path_model)
     model.to(device)
 
-    #mean, std = mean_std(train_set)
-    #print(mean, std)
-    mean, std = [0.596], [0.191]
     size_train = 0.80
 
     train_set, test_set = split_train_val(size_train, cac_dataset)
+
+    mean, std = mean_std(train_set)
+    print(mean, std)
+    #mean, std = [0.592], [0.192]
+
     train_set = normalize(train_set, mean, std)
     test_set = normalize(test_set, mean, std)
 
@@ -104,11 +105,11 @@ if __name__ == '__main__':
     #criterion = torch.nn.CrossEntropyLoss(weight=torch.tensor([1., 1.5], device=device))
     #criterion = torch.nn.BCEWithLogitsLoss()
 
-    criterion = torch.nn.CrossEntropyLoss( )
+    criterion = torch.nn.CrossEntropyLoss()
     lr = 1e-3
-    weight_decay = 1e-4
-    momentum=0.8
-    epochs = 80
+    weight_decay = 1e-3
+    momentum=0.80
+    epochs = 50
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 
     #optimizer = torch.optim.Adam(model.fc.parameters(), lr=lr, betas=(0.8, 0.999), eps=1e-08, weight_decay=weight_decay)
@@ -162,4 +163,3 @@ if __name__ == '__main__':
     hm.savefig(path_plot)
     hm.clf()
     plt.close(hm)
-    print(cm)
