@@ -30,11 +30,11 @@ def mean_std(dataset):
 
 def normalize(dataset, mean, std):
     dataset_norm = []
-    print('='*15, f'Normalizaing dataset','='*15)
+    print('='*15, f'Normalizing dataset','='*15)
     for j in trange(len(dataset)):
         label = dataset[j][1]
         img = dataset[j][0]
-        img_norm = (img - mean[0]) / (std[0] + 0.001)
+        img_norm = (img - mean[0]) / (std[0])
         dataset_norm.append((img_norm,label))
     return dataset_norm
 
@@ -67,6 +67,17 @@ def plot_data(path, tensor, transorm, index):
 
     plt.tight_layout()
     plt.savefig(path + str(index) + '.png')
+
+
+def show_sample(path, index, tensor):
+    f = plt.figure()
+                        
+    ax1 = f.add_subplot(1, 1, 1)
+    ax1.title.set_text('IMG')
+    ax1.grid(False)
+    plt.imshow(tensor.permute(1, 2, 0))
+    plt.savefig(path + str(index) + '_sample.png')
+
 
 
 def convert(img, target_type_min, target_type_max, target_type):

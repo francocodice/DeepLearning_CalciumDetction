@@ -10,7 +10,9 @@ from model import *
 from torch.optim.lr_scheduler import StepLR
 from transform import *
 
+SIZE_IMAGE = 1024
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+path_plot = '/home/fiodice/project/plot_transform/sample'
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc = 0., 0.
@@ -21,10 +23,13 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
         scheduler.step()
         print('LR:', scheduler.get_last_lr())
     
-
+    index = 0
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
         
+        #show_sample(path_plot,index, data[0].cpu())
+        index += 1
+
         optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
             outputs = model(data)
@@ -50,12 +55,11 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 if __name__ == '__main__':
     path_train_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/dataset/site.db'
-    path_plot = '/home/fiodice/project/plot_transform/sample'
+    #path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    transform = transforms.Compose([ transforms.Resize(2048),
-                                     transforms.CenterCrop(1800),
-                                     transforms.Resize(1024),
+    transform = transforms.Compose([ transforms.Resize((1200,1200)),
+                                     transforms.CenterCrop(SIZE_IMAGE),
                                      transforms.ToTensor()])
 
     # Normalization here decrese accuracy of the model and precision 
@@ -66,7 +70,7 @@ if __name__ == '__main__':
     model = load_densenet(path_model)
     model.to(device)
 
-    size_train = 0.80
+    size_train = 0.85
 
     train_set, test_set = split_train_val(size_train, cac_dataset)
 
@@ -89,8 +93,8 @@ if __name__ == '__main__':
                                             shuffle=False,
                                             num_workers=0)
 
-    #view_loader(train_loader, 'train')
-    #view_loader(test_loader, 'test')
+    show_distribution(train_loader, 'train')
+    show_distribution(test_loader, 'test')
 
     best_model = None
     best_loss = 1.
@@ -102,20 +106,22 @@ if __name__ == '__main__':
     test_acc = 0.
     test_loss = 0.
 
-    #criterion = torch.nn.CrossEntropyLoss(weight=torch.tensor([1., 1.5], device=device))
+    #criterion = torch.nn.CrossEntropyLoss(weight=torch.tensor([1, 1.2], device=device))
     #criterion = torch.nn.BCEWithLogitsLoss()
 
     criterion = torch.nn.CrossEntropyLoss()
-    lr = 1e-3
-    weight_decay = 1e-3
-    momentum=0.80
-    epochs = 50
+    #lr = 1e-3
+    lr = 0.001
+    weight_decay = 0.0001
+    #weight_decay = 1e-4
+
+    momentum = 0.8
+    epochs = 60
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 
     #optimizer = torch.optim.Adam(model.fc.parameters(), lr=lr, betas=(0.8, 0.999), eps=1e-08, weight_decay=weight_decay)
-    
     #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True, factor=0.05)
-    #scheduler = StepLR(optimizer, step_size=10, gamma=0.95)
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.95)
 
     print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize}')
     train_losses,test_losses  = [], []
@@ -123,8 +129,8 @@ if __name__ == '__main__':
     for epoch in range(1, epochs+1):
         print('='*15, f'Epoch: {epoch}','='*15)
         
-        train_loss, train_acc, _, _ = run(model, train_loader, criterion, optimizer)
-        test_loss, test_acc, true_labels, pred_labels = run(model, test_loader, criterion, optimizer, phase='test')
+        train_loss, train_acc, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
+        test_loss, test_acc, true_labels, pred_labels = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
         
         print(f'Train loss: {train_loss}, Train accuracy: {train_acc}')
         print(f'Test loss: {test_loss}, Test accuracy: {test_acc}\n')
@@ -132,12 +138,13 @@ if __name__ == '__main__':
         train_losses.append(train_loss)
         test_losses.append(test_loss)
             
-        if best_model is None or (test_loss < best_loss or test_acc > best_test_acc):
+        if best_model is None or (test_loss < best_loss) or (test_acc > best_test_acc):
             best_model = copy.deepcopy(model)
             best_test_loss = test_loss
             best_test_acc = test_acc 
             best_pred_labels = pred_labels
 
+    torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray.pt')
 
     #evalute_model(train_losses, test_losses, path_plot)
     #save_cm(true_labels, best_pred_labels, path_plot)
@@ -158,6 +165,7 @@ if __name__ == '__main__':
 
     #### Confusion Matrix ####
     cm = confusion_matrix(true_labels, best_pred_labels)
+    print(cm)
     ax = sns.heatmap(cm, annot=True, fmt="d")
     hm = ax.get_figure()
     hm.savefig(path_plot)

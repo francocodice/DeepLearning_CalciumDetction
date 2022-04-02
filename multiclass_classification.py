@@ -2,12 +2,10 @@ from pip import main
 import torch
 import torchvision
 import dataset
-import augmentation
 import copy
 import matplotlib.pyplot as plt
-from project.src.test.analysis import view_loader
 from utils import *
-from transform import *
+from project.src.transform import *
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 
@@ -97,7 +95,7 @@ if __name__ == '__main__':
     model =load_model_pretrained(path_model)
     print(model)
     ####### Augmentation ############
-    train_dataset = augmentation.increase_dataset(t_dataset)
+    #train_dataset = augmentation.increase_dataset(t_dataset)
 
     ####### Normalization ############
     mean, std = mean_std(train_dataset)
@@ -133,9 +131,9 @@ if __name__ == '__main__':
 
     #### View Class distribution ####
 
-    view_loader(train_loader, 'train')
-    view_loader(val_loader, 'val')
-    view_loader(test_loader, 'test')
+    show_distribution(train_loader, 'train')
+    show_distribution(val_loader, 'val')
+    show_distribution(test_loader, 'test')
 
 
 

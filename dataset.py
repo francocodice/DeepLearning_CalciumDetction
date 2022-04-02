@@ -1,4 +1,5 @@
 
+import imp
 import torch
 from PIL import Image
 import glob
@@ -8,10 +9,8 @@ import numpy as np
 import sqlite3
 from utils import convert
 from pydicom.pixel_data_handlers.util import apply_modality_lut, apply_windowing
-from transform import *
-import torchvision.transforms as transforms
+from utils import *
 
-SIZE_IMAGE = 1024
 
 class CalciumDetection(torch.utils.data.Dataset):
     def __init__(self, data_dir, labels_path, transform=None):
@@ -44,24 +43,11 @@ class CalciumDetection(torch.utils.data.Dataset):
 
         # Manage label                
         cac_score = [label for label in self.labels if label['id'] == dimg.PatientID][0]['cac_score']
-        label = 0 if int(cac_score) in range(0, 100) else 1
+        label = 0 if int(cac_score) in range(0, 11) else 1
 
         if self.transform is not None:
             img = self.transform(Image.fromarray(img))
+        else:
+            img = Image.fromarray(img)
 
         return img, label
-
-
-def split_train_test(size_train, cac_dataset):
-    valid_size = 1 - size_train
-    num_train = len(cac_dataset)
-    indices = list(range(num_train))
-    np.random.shuffle(indices)
-    split = int(np.floor(valid_size * num_train))
-    train_idx, valid_idx = indices[split:], indices[:split]
-
-    # define samplers for obtaining training and validation batches
-    train_dataset = torch.utils.data.Subset(cac_dataset, train_idx)
-    test_dataset = torch.utils.data.Subset(cac_dataset, valid_idx)
-
-    return train_dataset, test_dataset

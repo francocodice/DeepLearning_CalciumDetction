@@ -206,9 +206,9 @@ def load_densenet(path_model):
         param.requires_grad = False
 
     model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(1024, 32),
+            torch.nn.Linear(1024, 48),
             torch.nn.ReLU(),
-            torch.nn.Linear(32, 2))
+            torch.nn.Linear(48, 2))
 
     for param in model.fc.parameters():
         param.requires_grad = True
