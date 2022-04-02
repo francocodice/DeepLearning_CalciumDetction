@@ -72,6 +72,8 @@ if __name__ == '__main__':
     model.eval()
     model.to(device)
 
+
+    ## Work better without ##
     #mean, std = mean_std(cac_dataset)
     #mean, std = [0.5884], [0.1927]
     #print(mean, std)
