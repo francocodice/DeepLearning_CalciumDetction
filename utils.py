@@ -52,34 +52,6 @@ def show_distribution(dataloader, set):
     print(f'For {set} Labels {count_labels}')
 
 
-def plot_data(path, tensor, transorm, index):
-    f = plt.figure()
-                        
-    ax1 = f.add_subplot(1, 2, 1)
-    ax1.title.set_text('IMG')
-    ax1.grid(False)
-    plt.imshow(tensor.permute(1, 2, 0))
-                        
-    ax2 = f.add_subplot(1, 2, 2)
-    ax2.title.set_text('Affine')
-    ax2.grid(False)
-    plt.imshow(transorm.permute(1, 2, 0) )
-
-    plt.tight_layout()
-    plt.savefig(path + str(index) + '.png')
-
-
-def show_sample(path, index, tensor):
-    f = plt.figure()
-                        
-    ax1 = f.add_subplot(1, 1, 1)
-    ax1.title.set_text('IMG')
-    ax1.grid(False)
-    plt.imshow(tensor.permute(1, 2, 0))
-    plt.savefig(path + str(index) + '_sample.png')
-
-
-
 def convert(img, target_type_min, target_type_max, target_type):
     imin = img.min()
     imax = img.max()

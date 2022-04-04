@@ -18,12 +18,12 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc = 0., 0.
     samples_num  = 0.
     true_labels, pred_labels = [], []
+
+    
     
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
         
-        #show_sample(path_plot,index, data[0].cpu())
-
         optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
             outputs = model(data)
@@ -41,44 +41,32 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
         epoch_loss += loss.detach().cpu().item()
         epoch_acc += torch.sum(preds == labels.data)
         samples_num += len(labels)
-    
+
     if scheduler is not None and phase == 'train':
         scheduler.step()
         print('LR:', scheduler.get_last_lr())
-
+    
     print()
     return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy()
 
 
 if __name__ == '__main__':
-    path_train_data = '/home/fiodice/project/dataset/'
+    path_train_data = '/home/fiodice/project/dataset_split/train/'
+    path_test_data = '/home/fiodice/project/dataset_split/test/'
     path_labels = '/home/fiodice/project/dataset/site.db'
-    #path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    transform = transforms.Compose([ transforms.Resize((1248,1248)),
-                                     transforms.CenterCrop(SIZE_IMAGE),
-                                     transforms.ToTensor()])
+    mean, std = [0.592], [0.192]
+    train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
-    cac_dataset = dataset.CalciumDetection(path_train_data, path_labels, transform)
+    # Normalization here decrese accuracy of the model and precision 
+    # of mean, std overall the dataset.
 
-    # Best model on
-    # Test set : 75%
-    # Train set : 77%  
+    train_set = dataset.CalciumDetection(path_train_data, path_labels, transform=train_t)
+    test_set = dataset.CalciumDetection(path_test_data, path_labels, transform=test_t)
 
     model = load_densenet(path_model)
     model.to(device)
-
-    size_train = 0.80
-
-    train_set, test_set = split_train_val(size_train, cac_dataset)
-
-    mean, std = mean_std(train_set)
-    print(mean, std)
-    #mean, std = [0.5957], [0.1841]
-
-    train_set = normalize(train_set, mean, std)
-    test_set = normalize(test_set, mean, std)
 
     batchsize = 4
 
@@ -114,12 +102,13 @@ if __name__ == '__main__':
     weight_decay = 0.0001
     #weight_decay = 1e-4
 
-    momentum = 0.8
-    epochs = 80
+    momentum = 0.9
+    epochs = 60
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 
     #optimizer = torch.optim.Adam(model.fc.parameters(), lr=lr, betas=(0.8, 0.999), eps=1e-08, weight_decay=weight_decay)
     #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True, factor=0.05)
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.95)
 
     print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize}')
     train_losses,test_losses  = [], []
@@ -127,8 +116,8 @@ if __name__ == '__main__':
     for epoch in range(1, epochs+1):
         print('='*15, f'Epoch: {epoch}','='*15)
         
-        train_loss, train_acc, _, _ = run(model, train_loader, criterion, optimizer)
-        test_loss, test_acc, true_labels, pred_labels = run(model, test_loader, criterion, optimizer, phase='test')
+        train_loss, train_acc, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
+        test_loss, test_acc, true_labels, pred_labels = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
         
         print(f'Train loss: {train_loss}, Train accuracy: {train_acc}')
         print(f'Test loss: {test_loss}, Test accuracy: {test_acc}\n')
@@ -136,7 +125,7 @@ if __name__ == '__main__':
         train_losses.append(train_loss)
         test_losses.append(test_loss)
             
-        if best_model is None or (test_loss < best_loss):
+        if best_model is None or (test_loss < best_loss) or (test_acc > best_test_acc):
             best_model = copy.deepcopy(model)
             best_test_loss = test_loss
             best_test_acc = test_acc 

@@ -1,15 +1,16 @@
 
-import imp
 import torch
 from PIL import Image
 import glob
 import os
+import torchvision
 import pydicom
 import numpy as np
 import sqlite3
 from utils import convert
 from pydicom.pixel_data_handlers.util import apply_modality_lut, apply_windowing
 from utils import *
+from transform import *
 
 
 class CalciumDetection(torch.utils.data.Dataset):
@@ -37,17 +38,40 @@ class CalciumDetection(torch.utils.data.Dataset):
         #w_center, w_width = windowing_param(dimg) 
         #img16 = windowing(hu, w_center, w_width)
 
+        #print(f'Img {os.listdir(self.elem[idx])[0]} Min {img16.min()} Max {img16.max()}')
+
         img8 = convert(img16, 0, 255, np.uint8)
-        img = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
-        #img = Image.fromarray(cv2.cvtColor(img8_pstd,cv2.COLOR_GRAY2RGB))
+        img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
+        img = Image.fromarray(img_array)
 
         # Manage label                
         cac_score = [label for label in self.labels if label['id'] == dimg.PatientID][0]['cac_score']
         label = 0 if int(cac_score) in range(0, 11) else 1
 
         if self.transform is not None:
-            img = self.transform(Image.fromarray(img))
+            img = self.transform(img=img)
         else:
-            img = Image.fromarray(img)
+            img = torchvision.transforms.ToTensor()(img)
+
 
         return img, label
+
+
+if __name__ == '__main__':
+    path_data = '/home/fiodice/project/dataset/'
+    path_labels = '/home/fiodice/project/dataset/site.db'
+
+    transform = transforms.Compose([ transforms.Resize((1248,1248)),
+                                     transforms.CenterCrop(1024),
+                                     transforms.ToTensor()])
+
+    whole_dataset = CalciumDetection(path_data, path_labels, transform=transform)
+    
+    loader = torch.utils.data.DataLoader(whole_dataset,
+                            batch_size = 1,
+                            shuffle = False,
+                            num_workers = 0)
+
+    for batch_idx, (data, labels) in enumerate(loader):
+        a = 1
+        #print(data.shape, labels.shape)

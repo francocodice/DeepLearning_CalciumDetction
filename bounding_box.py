@@ -1,12 +1,20 @@
 from sys import stderr
+from this import d
 import torch
 from utils import *
 from model import UNet
 from dataset import CalciumDetection
 from transform import *
+import torchvision
+from torchvision.utils import draw_segmentation_masks
+import torchvision.transforms.functional as F
+import cv2
+from torchvision.ops import masks_to_boxes
+from torchvision.utils import draw_bounding_boxes
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-path_plot = '/home/fiodice/project/example_segmentation/img_nopre'
+path_plot = '/home/fiodice/project/example_segmentation/xray'
 SIZE_IMAGE = 512
 
 
@@ -50,15 +58,28 @@ def show_samples_seg(count, input, output):
     print('plot')
 
 
+def show(imgs, msg, path):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    fix, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+    for i, img in enumerate(imgs):
+        img = img.detach()
+        img = F.to_pil_image(img)
+        axs[0, i].imshow(np.asarray(img))
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+    plt.tight_layout()
+    plt.savefig(path + msg + '.png')
+    plt.close()
+
 
 if __name__ == '__main__':
     path_train_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/dataset/site.db'
     #path_plot = '/home/fiodice/project/plot_transform/sample'
-    path_model = '/home/fiodice/project/model/segmentation_model.pt'
+    path_model = '/home/fiodice/segmentation_model_fi.pt'
+    #path_model = '/home/fiodice/project/model/segmentation_model.pt'
 
-    transform = transforms.Compose([ transforms.Resize((600,600)),
-                                     transforms.CenterCrop(SIZE_IMAGE),
+    transform = transforms.Compose([ transforms.Resize((SIZE_IMAGE,SIZE_IMAGE)),
                                      transforms.ToTensor()])
 
     # Normalization here decrese accuracy of the model and precision 
@@ -66,16 +87,15 @@ if __name__ == '__main__':
 
     cac_dataset = CalciumDetection(path_train_data, path_labels, transform)
 
-    model = UNet(in_channels=1, out_channels=6, init_features=32)
+    model = UNet(in_channels=1, out_channels=5, init_features=32)
     # output channel is the number of masks obtained (READ CLASS DATASET)
     model.load_state_dict(torch.load(path_model, map_location=device))
     model.eval()
     model.to(device)
 
 
-    ## Work better without ##
     #mean, std = mean_std(cac_dataset)
-    #mean, std = [0.5884], [0.1927]
+    mean, std = [0.5884], [0.1927]
     #print(mean, std)
     #dataset = normalize(cac_dataset, mean, std)
 
@@ -91,8 +111,34 @@ if __name__ == '__main__':
         data, labels = data.to(device), labels.to(device)
         with torch.no_grad():
             output = model(data)
-            output_norm = torch.nn.functional.softmax(output, dim=1)
-            show_samples_seg(batch_idx, data[0].squeeze(0).cpu(), output_norm[0].cpu())
+            img = data[0]
+            masks = torch.nn.functional.softmax(output, dim=1)[0]
+            masks = torch.argmax(masks, dim=0, keepdim=True).type(torch.long)
 
-            if batch_idx == 50:
+            obj_ids = torch.unique(masks)
+            # to fix
+            #obj_ids = torch.tensor([0, 2, 4], device=device)
+
+            # split the color-encoded mask into a set of boolean masks.
+            # Note that this snippet would work as well if the masks were float values instead of ints.
+            masks = masks == obj_ids[:, None, None]
+
+            drawn_masks = []
+            img_rgb = cv2.cvtColor(img.permute(1,2,0).cpu().detach().numpy() ,cv2.COLOR_GRAY2RGB)
+            img_rgb = torchvision.transforms.ToTensor()(img_rgb)
+            img = F.convert_image_dtype(img_rgb, dtype=torch.uint8)
+
+            for mask in masks:
+                drawn_masks.append(draw_segmentation_masks(img, mask, alpha=0.8, colors="green"))
+            
+
+            boxes = masks_to_boxes(masks)
+            drawn_boxes = draw_bounding_boxes(img, boxes, colors="red")
+
+            drawn_masks.append(drawn_boxes)
+
+            show(drawn_masks, 'box' + str(batch_idx), path=path_plot)
+
+            if batch_idx == 5:
                 break
+

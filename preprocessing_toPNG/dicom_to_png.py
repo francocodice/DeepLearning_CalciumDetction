@@ -31,12 +31,6 @@ if __name__ == '__main__':
     path_labels = '/home/fiodice/project/dataset/site.db'
     path_img_out = '/home/fiodice/project/data_resize/'
 
-    conn = sqlite3.connect(path_labels)
-    conn.row_factory = sqlite3.Row  
-    cursor = conn.cursor()
-    labels = [dict(row) for row in cursor.execute('SELECT * FROM patient').fetchall()]
-
-
     # File of dicom image
     DCM_files = []
     for dir_name, sub_dir_list, file_list in os.walk(path_train_data):

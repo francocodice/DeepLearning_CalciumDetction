@@ -1,11 +1,11 @@
 import torch
 from utils import *
 from model import UNet
-from dataset_seg import CalciumDetectionSegmentation
+from dataset_png import CalciumDetectionSegmentationPNG
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-path_plot = '/home/fiodice/project/example_segmentation/img'
+path_plot = '/home/fiodice/project/example_segmentation/imgnorm'
 
 def decode_segmap(seg_mask, nc=6):
     label_colors = np.array([(128, 0, 128),     # 0 (fucsia) = heart
@@ -51,13 +51,19 @@ if __name__ == '__main__':
     path_data = '/home/fiodice/project/data_resize_512/'
     path_model = '/home/fiodice/project/model/segmentation_model.pt'
 
-    seg_dataset = CalciumDetectionSegmentation(path_data)
+    # Read dicom file as PNG file stored in data_resize_512 e data_resize_2048
+    seg_dataset = CalciumDetectionSegmentationPNG(path_data)
 
-    model = UNet(in_channels=1, out_channels=6, init_features=32)
-    # output channel is the number of masks obtained (READ CLASS DATASET)
+    model = UNet(in_channels=1, out_channels=5, init_features=32)
+
     model.load_state_dict(torch.load(path_model, map_location=device))
     model.eval()
     model.to(device)
+
+    mean, std = mean_std(seg_dataset)
+    #mean, std = [0.5884], [0.1927]
+    #print(mean, std)
+    dataset = normalize(seg_dataset, mean, std)
 
     
     test_loader = torch.utils.data.DataLoader(seg_dataset,
