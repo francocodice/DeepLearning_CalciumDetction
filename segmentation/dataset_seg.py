@@ -8,6 +8,8 @@ import numpy as np
 from pydicom.pixel_data_handlers.util import apply_modality_lut, apply_windowing
 from torchvision import transforms
 
+
+
 def convert(img, target_type_min, target_type_max, target_type):
     imin = img.min()
     imax = img.max()
@@ -24,7 +26,8 @@ class HeartSegmentation(torch.utils.data.Dataset):
     def __init__(self, img_dir, mask_dir, transform=None, crossentropy_prepare=False):
         self.root = img_dir
         self.mask = mask_dir
-        self.mask_order = ['heart', 'left clavicle', 'left lung', 'right clavicle', 'right lung']
+        #self.mask_order = ['heart', 'left clavicle', 'left lung', 'right clavicle', 'right lung']
+        self.mask_order = ['heart', 'left lung', 'right lung']
         self.transform = transform  ##to be implemented
         self.elem = glob.glob(self.root + '*')
         self.crossentropy_prepare = crossentropy_prepare
@@ -35,9 +38,7 @@ class HeartSegmentation(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         path = self.elem[idx]
-        #print(path)
         data_reshaped = np.fromfile(path, dtype=">u2")
-        #print("Size of this file is ", data_reshaped.shape)
 
         if data_reshaped.shape[0] < 4194304:
             temp = np.zeros(4194304)
@@ -51,9 +52,9 @@ class HeartSegmentation(torch.utils.data.Dataset):
         name_for_masks = path.split('/')[-1].split('.')[0] + '.png'
         these_masks = [Image.open(self.mask + fold + '/' + name_for_masks).convert('L') for fold in self.mask_order]
 
-        # image to tensor
         if self.transform is not None:
             this_image = self.transform(img=img)
+        # Default shape 2048x2048
         else:
             this_image = torchvision.transforms.ToTensor()(img)
         #this_image = torchvision.transforms.Normalize((0.5,), (1.0,))(this_image)  # fix these values
@@ -61,7 +62,9 @@ class HeartSegmentation(torch.utils.data.Dataset):
         # piling tensors
         these_masks_tensorized = [torchvision.transforms.ToTensor()(this_mask).squeeze(dim=0) for this_mask in
                                   these_masks]
+                                  
         masks = torch.stack(these_masks_tensorized)
+        masks = torch.cat((masks, (torch.sum(masks, dim=0, keepdim=True) == 0)), 0)
 
         if self.crossentropy_prepare:
             masks = torch.cat((masks, (torch.sum(masks, dim=0, keepdim=True) == 0)), 0)

@@ -11,7 +11,9 @@ from torch.optim.lr_scheduler import StepLR
 from transform import *
 
 SIZE_IMAGE = 1024
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 path_plot = '/home/fiodice/project/plot_transform/sample'
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
