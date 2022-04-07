@@ -11,21 +11,21 @@ import torchvision
 from torchvision.utils import draw_segmentation_masks
 import torchvision.transforms.functional as F
 import cv2
-from torchvision.ops import masks_to_boxes
+from torchvision.ops import *
 from torchvision.utils import draw_bounding_boxes
-from skimage.morphology import (erosion, dilation, closing, opening,
-                                area_closing, area_opening)
+from skimage.morphology import ( dilation, closing, opening)
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-path_plot = '/home/fiodice/project/example_segmentation/'
+path_plot_bounding_box = '/home/fiodice/project/bounding_box/'
+
 SIZE_IMAGE = 512
 
 
-def show(imgs, msg, path):
+def show(imgs, name_file, path):
     if not isinstance(imgs, list):
         imgs = [imgs]
-    fix, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+    _, axs = plt.subplots(ncols=len(imgs), squeeze=False)
     for i, img in enumerate(imgs):
         if type(img) == torch.tensor:
             img = img.detach()
@@ -34,7 +34,7 @@ def show(imgs, msg, path):
         axs[0, i].imshow(np.asarray(img), cmap='gray')
         axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
     plt.tight_layout()
-    plt.savefig(path + msg + '.png')
+    plt.savefig(path + name_file + '.png')
     plt.close()
 
 
@@ -46,62 +46,69 @@ def multi_dil(im, num, elem):
 
 def dilate_heart_mask(mask, batch_idx):
     new_mask = np.zeros(mask.shape).astype(np.uint8)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+    plots = [mask]
 
-    samples = [mask]
-    n, _, _, _ = cv2.connectedComponentsWithStats(mask.cpu().numpy().astype(np.uint8), 4)
-    print(f'For batch id {batch_idx} before processing nb comp {n}')
-
+    n, _, _, _ = cv2.connectedComponentsWithStats(mask.cpu().numpy().astype(np.uint8), 8)
     # 0 for the bck , 1 for heart 
-    if n > 1:
-        # small erosion for remove noise 
-        close_mask = erosion(mask.cpu(), np.ones((4, 4)))
-        # big dilation to be sure of take shadow heart
-        dilated_mask = multi_dil(close_mask, 2, np.ones((8, 8)))
 
-        samples.append(dilated_mask)
+    #print(f'For batch id {batch_idx} before processing nb comp {n}')
+
+    if n == 1:
+        new_mask[disk((256, 256), 60)] = 1
+        return torch.tensor(new_mask)
+    else:
+        # small erosion for remove noise 
+        open_mask = opening(mask.cpu(), kernel)
+        plots.append(open_mask)
         #show(samples, 'segmap', path=path_plot)
 
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(dilated_mask.astype(np.uint8) , 4 , cv2.CV_32S)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(open_mask.astype(np.uint8) , 8 , cv2.CV_32S)
         
+        # if after opening there is no more then 2 element only noise mask
         if num_labels == 1:
-            new_mask[disk((256, 256), 40)] = 1
+            new_mask[disk((256, 256), 60)] = 1
+            return torch.tensor(new_mask)
         else:
             max_label, _ = max([(i, stats[i, cv2.CC_STAT_AREA]) for i in range(1, num_labels)], key=lambda x: x[1])
-                # max_label is the background without the heart shadow zone, so i take when is differente from 
-                # associate labels
+            # max_label is the background without the heart shadow zone, so i take when is differente from 
+            # associate labels
             new_mask[labels == max_label] = 1
-            new_mask = multi_dil(new_mask, 3, np.ones((10, 10)))
+            new_mask = closing(new_mask, np.ones((15, 15)))
+            new_mask = multi_dil(new_mask, 3, np.ones((15, 15)))
         
+        #print(f'For batch id {batch_idx} nb comp {num_labels}')
 
-        print(f'For batch id {batch_idx} nb comp {num_labels}')
-    else:
-        # if the code is here the nn has not inferred the heart
-        # put a circle at the center of image
-        new_mask[disk((256, 256), 40)] = 1
-
-
-    samples.append(new_mask)
-
-    show(samples, 'heart_mask_' + str(batch_idx), path=path_plot)
-
-    #cv2.imshow("Biggest component", img2)
+    plots.append(new_mask)
+    show(plots, str(batch_idx) + '_heart', path=path_plot_bounding_box)
 
     return torch.tensor(new_mask)
 
 
-def close_lung(mask, lung_d):
-    samples = [mask]
+def opening_lung(mask, lung_d):
+    new_mask = np.zeros(mask.shape).astype(np.uint8)
+    kernel = np.ones((22, 22))
 
-    # to remove big noise -> big structered element
-    struc_element = np.ones((20, 20))
-    close_mask = erosion(mask.cpu(), struc_element)
-    close_mask = dilation(close_mask, struc_element)
+    plots = [mask]
 
-    samples.append(close_mask)
-    show(samples, 'lung_mask_' + lung_d + str(batch_idx), path=path_plot)
+    open_mask = opening(mask.cpu(), kernel)
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(open_mask.astype(np.uint8) , 4 , cv2.CV_32S)
+    plots.append(open_mask)
+
+    if num_labels == 1:
+        new_mask = np.copy(mask.cpu())
+    else:
+        max_label, _ = max([(i, stats[i, cv2.CC_STAT_AREA]) for i in range(1, num_labels)], key=lambda x: x[1])
+        new_mask[labels == max_label] = 1
+        new_mask = closing(new_mask, kernel)
+
+
+    plots.append(new_mask)
+
+    show(plots, str(batch_idx) + '_lung_mask' + lung_d, path=path_plot_bounding_box)
 
     #show(samples, 'segmap', path=path_plot)
-    return torch.tensor(close_mask)
+    return torch.tensor(new_mask)
 
     
 
@@ -121,23 +128,28 @@ def bounding_box(batch_idx, img, masks):
     masks = masks == obj_ids[:, None, None]
 
     mask_heart = dilate_heart_mask(masks[0].int(), batch_idx)
-    mask_left_lung = close_lung(masks[1].int(),'left')
-    mask_right_lung = close_lung(masks[2].int(),'right')
+    mask_left_lung = opening_lung(masks[1].int(),'left')
+    mask_right_lung = opening_lung(masks[2].int(),'right')
 
-    masks = torch.stack([mask_heart, mask_left_lung, mask_right_lung])
+    masks = torch.stack([ mask_heart, mask_left_lung, mask_right_lung])
     img_rgb = rgb_img(img)
 
     drawn_masks = []
     for mask in masks:
         drawn_masks.append(draw_segmentation_masks(img_rgb, mask.bool(), alpha=0.8, colors="green"))
 
+    #masks_flat = torch.argmax(masks, dim=0, keepdim=True)
+    #single_boxe = masks_to_boxes(masks_flat)
+
     boxes = masks_to_boxes(masks)
+    #heart_area = box_area(boxes[0])
+    # boxes -> list of ( xmin , xmax , ymin , ymax )
     drawn_boxes = draw_bounding_boxes(img_rgb, boxes, colors="red")
 
     # in order to visualize all
     drawn_masks.append(drawn_boxes)
 
-    show(drawn_masks, 'bounding_box' + str(batch_idx), path=path_plot)
+    show(drawn_masks, str(batch_idx) + '_boundig_box', path=path_plot_bounding_box)
 
 
 
@@ -162,14 +174,14 @@ if __name__ == '__main__':
     model.to(device)
 
 
-    #mean, std = mean_std(cac_dataset)
-    mean, std = [0.5884], [0.1927]
-    #print(mean, std)
-    #dataset = normalize(cac_dataset, mean, std)
+    mean, std = mean_std(cac_dataset)
+    #mean, std = [0.5719], [0.2098] overall the dataset
+    print(mean, std)
+    dataset = normalize(cac_dataset, mean, std)
 
     
     test_loader = torch.utils.data.DataLoader(cac_dataset,
-                                            batch_size=4,
+                                            batch_size=1,
                                             shuffle=False,
                                             num_workers=0)
 
@@ -179,11 +191,9 @@ if __name__ == '__main__':
         data, labels = data.to(device), labels.to(device)
         with torch.no_grad():
             output = model(data)
-
             img = data[0]
             masks = torch.nn.functional.softmax(output, dim=1)[0]
 
             bounding_box(batch_idx, img, masks)
+            print(batch_idx)
 
-            if batch_idx == 50:
-                break
