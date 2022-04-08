@@ -31,7 +31,6 @@ class CalciumDetection(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         path = self.elem[idx] + os.listdir(self.elem[idx])[0]
-        #print(path)
         dimg = pydicom.dcmread(path, force=True)
         img16 = apply_windowing(dimg.pixel_array, dimg)   
         #hu = apply_modality_lut(dimg.pixel_array, dimg)  
@@ -53,25 +52,25 @@ class CalciumDetection(torch.utils.data.Dataset):
         else:
             img = torchvision.transforms.ToTensor()(img)
 
+        #print(f'{path} label {label}')
 
         return img, label
 
 
 if __name__ == '__main__':
-    path_data = '/home/fiodice/project/dataset/'
+    path_data = '/home/fiodice/project/dataset_split/test/'
     path_labels = '/home/fiodice/project/dataset/site.db'
 
     transform = transforms.Compose([ transforms.Resize((1248,1248)),
                                      transforms.CenterCrop(1024),
                                      transforms.ToTensor()])
 
-    whole_dataset = CalciumDetection(path_data, path_labels, transform=transform)
+    dataset = CalciumDetection(path_data, path_labels, transform=transform)
     
-    loader = torch.utils.data.DataLoader(whole_dataset,
+    loader = torch.utils.data.DataLoader(dataset,
                             batch_size = 1,
                             shuffle = False,
                             num_workers = 0)
 
     for batch_idx, (data, labels) in enumerate(loader):
-        a = 1
-        #print(data.shape, labels.shape)
+        x = data.shape

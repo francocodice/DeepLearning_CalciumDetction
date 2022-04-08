@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import StepLR
 from transform import *
 
 SIZE_IMAGE = 1024
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 path_plot = '/home/fiodice/project/plot_transform/sample'
 
@@ -18,8 +19,6 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc = 0., 0.
     samples_num  = 0.
     true_labels, pred_labels = [], []
-
-    
     
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
@@ -29,7 +28,6 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
             outputs = model(data)
             _, preds = torch.max(outputs, 1)
             loss = criterion(outputs, labels).to(device)
-
 
         true_labels.append(labels.detach().cpu())
         pred_labels.append(preds.detach().cpu())
@@ -44,7 +42,6 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 
     if scheduler is not None and phase == 'train':
         scheduler.step()
-        print('LR:', scheduler.get_last_lr())
     
     print()
     return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy()
@@ -56,7 +53,7 @@ if __name__ == '__main__':
     path_labels = '/home/fiodice/project/dataset/site.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    mean, std = [0.592], [0.192]
+    mean, std = [0.5024], [0.2898]
     train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
     # Normalization here decrese accuracy of the model and precision 
@@ -102,7 +99,7 @@ if __name__ == '__main__':
     weight_decay = 0.0001
     #weight_decay = 1e-4
 
-    momentum = 0.9
+    momentum = 0.8
     epochs = 60
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 

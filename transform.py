@@ -3,6 +3,7 @@ import torchvision.transforms as transforms
 def get_transforms(img_size, crop, mean, std):
     train_transforms = transforms.Compose([
         transforms.Resize((img_size, img_size)),
+        transforms.RandomRotation(degrees=15),
         transforms.CenterCrop(crop),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),

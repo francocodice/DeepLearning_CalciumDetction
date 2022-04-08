@@ -1,7 +1,7 @@
 from sys import stderr
 from this import d
+from matplotlib.pyplot import box
 import torch
-from torch import tensor
 from utils import *
 from skimage.draw import disk
 from model import UNet
@@ -14,10 +14,10 @@ import cv2
 from torchvision.ops import *
 from torchvision.utils import draw_bounding_boxes
 from skimage.morphology import ( dilation, closing, opening)
-
+import torchvision.transforms as T
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-path_plot_bounding_box = '/home/fiodice/project/bounding_box/'
+path_plot_bounding_box = '/home/fiodice/project/elab/'
 
 SIZE_IMAGE = 512
 
@@ -75,12 +75,12 @@ def dilate_heart_mask(mask, batch_idx):
             # associate labels
             new_mask[labels == max_label] = 1
             new_mask = closing(new_mask, np.ones((15, 15)))
-            new_mask = multi_dil(new_mask, 3, np.ones((15, 15)))
+            new_mask = multi_dil(new_mask, 6, np.ones((15, 15)))
         
         #print(f'For batch id {batch_idx} nb comp {num_labels}')
 
     plots.append(new_mask)
-    show(plots, str(batch_idx) + '_heart', path=path_plot_bounding_box)
+    #show(plots, str(batch_idx) + '_heart', path=path_plot_bounding_box)
 
     return torch.tensor(new_mask)
 
@@ -105,12 +105,10 @@ def opening_lung(mask, lung_d):
 
     plots.append(new_mask)
 
-    show(plots, str(batch_idx) + '_lung_mask' + lung_d, path=path_plot_bounding_box)
+    #show(plots, str(batch_idx) + '_lung_mask' + lung_d, path=path_plot_bounding_box)
 
     #show(samples, 'segmap', path=path_plot)
     return torch.tensor(new_mask)
-
-    
 
 
 def rgb_img(tensor):
@@ -119,14 +117,23 @@ def rgb_img(tensor):
     return F.convert_image_dtype(img_rgb, dtype=torch.uint8)
 
 
+def build_box(boxes):
+    x_min = min(boxes[0][0], boxes[1][0], boxes[2][0])
+    y_min = min(boxes[0][1], boxes[1][1], boxes[2][1])
+    x_max = max(boxes[0][2], boxes[1][2], boxes[2][2])
+    y_max = max(boxes[0][3], boxes[1][3], boxes[2][3])
+    return torch.tensor([[x_min, y_min, x_max, y_max]])
+
+
 def bounding_box(batch_idx, img, masks):
-    # 0 -> heart, 2 -> left lung, 4 -> right lungh
+    # 5 masks : 0 -> heart, 2 -> left lung, 4 -> right lungh
     obj_ids = torch.tensor([0, 2, 4], device=device)
     # split the color-encoded mask into a set of boolean masks.
     # Note that this snippet would work as well if the masks were float values instead of ints.
     masks = torch.argmax(masks, dim=0, keepdim=True).type(torch.long)
     masks = masks == obj_ids[:, None, None]
 
+    # 0 -> heart, 1 -> left lung, 2 -> right lungh
     mask_heart = dilate_heart_mask(masks[0].int(), batch_idx)
     mask_left_lung = opening_lung(masks[1].int(),'left')
     mask_right_lung = opening_lung(masks[2].int(),'right')
@@ -134,9 +141,9 @@ def bounding_box(batch_idx, img, masks):
     masks = torch.stack([ mask_heart, mask_left_lung, mask_right_lung])
     img_rgb = rgb_img(img)
 
-    drawn_masks = []
-    for mask in masks:
-        drawn_masks.append(draw_segmentation_masks(img_rgb, mask.bool(), alpha=0.8, colors="green"))
+    plot_result = []
+    #for mask in masks:
+    #    plot_result.append(draw_segmentation_masks(img_rgb, mask.bool(), alpha=0.8, colors="green"))
 
     #masks_flat = torch.argmax(masks, dim=0, keepdim=True)
     #single_boxe = masks_to_boxes(masks_flat)
@@ -146,11 +153,61 @@ def bounding_box(batch_idx, img, masks):
     # boxes -> list of ( xmin , xmax , ymin , ymax )
     drawn_boxes = draw_bounding_boxes(img_rgb, boxes, colors="red")
 
-    # in order to visualize all
-    drawn_masks.append(drawn_boxes)
+    # in order to visualize all boxex
+    plot_result.append(drawn_boxes)
 
-    show(drawn_masks, str(batch_idx) + '_boundig_box', path=path_plot_bounding_box)
+    boxes_custom = crop_boxes(boxes)
 
+    plot_result.append(draw_bounding_boxes(img_rgb, boxes_custom, colors="blue"))
+
+    shadow_heart_box = build_box(boxes_custom)
+
+    plot_result.append(draw_bounding_boxes(img_rgb, shadow_heart_box, colors="yellow"))
+
+    box_tuple = (shadow_heart_box[0][0].item(), 
+                shadow_heart_box[0][1].item(), 
+                shadow_heart_box[0][2].item(),
+                shadow_heart_box[0][3].item())
+            
+    #print(box_tuple)
+    im = transforms.ToPILImage()(img).convert("L")
+    im_cropped = im.crop(box_tuple)
+
+    plot_result.append(np.array(im_cropped))
+
+    show(plot_result, str(batch_idx) + '_boundig_box', path=path_plot_bounding_box)
+
+
+def crop_boxes(boxes):
+    # boxes = [ ( xmin , xmax , ymin , ymax ) ]
+    # boxes[0] -> heart, boxes[1] -> left lung, boxes[2] -> right lungh
+    id_left_lung = 2
+    id_right_lung = 1 
+
+    perc_width_lung_sx = (boxes[id_left_lung][2] - boxes[id_left_lung][0])/100
+    perc_height_lung_sx = (boxes[id_left_lung][3] - boxes[id_left_lung][1])/100
+    #print(f'For left lungh W :{perc_width_lung_sx * 100}, H {perc_height_lung_sx * 100}')
+
+    boxes[id_left_lung][0] = boxes[id_left_lung][0] + (perc_width_lung_sx * 35) # -> OK
+    boxes[id_left_lung][1] = boxes[id_left_lung][1] + (perc_height_lung_sx * 10) # -> OK
+    #boxes[id_left_lung][3] = boxes[id_left_lung][3] - (perc_height_lung_sx * 10) # -> OK
+
+    perc_width_lung_dx = (boxes[id_right_lung][2] - boxes[id_right_lung][0])/100
+    perc_height_lung_dx = (boxes[id_right_lung][3] - boxes[id_right_lung][1])/100
+    #print(f'For right lungh W :{perc_width_lung_dx * 100}, H {perc_height_lung_dx * 100}')
+
+    boxes[id_right_lung][2] = boxes[id_right_lung][0] + (perc_width_lung_dx * 65) # -> OK
+    boxes[id_right_lung][1] = boxes[id_right_lung][1] + (perc_height_lung_dx * 10) # -> OK
+    #boxes[id_right_lung][3] = boxes[id_right_lung][3] - (perc_height_lung_dx * 10) # -> OK
+
+    return boxes
+
+
+def erose_lung_mask(boundig_box, orientation):
+    if orientation == 'right':
+        pass
+    elif orientation == 'left':
+        pass
 
 
 ## Test bounding box inferred from mask
@@ -161,8 +218,7 @@ if __name__ == '__main__':
     #path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/segmentation_model.pt'
 
-    transform = transforms.Compose([ transforms.Resize((560,560)),
-                                     transforms.CenterCrop(SIZE_IMAGE),
+    transform = transforms.Compose([ transforms.Resize((SIZE_IMAGE,SIZE_IMAGE)),
                                      transforms.ToTensor()])
 
 
@@ -174,10 +230,10 @@ if __name__ == '__main__':
     model.to(device)
 
 
-    mean, std = mean_std(cac_dataset)
-    #mean, std = [0.5719], [0.2098] overall the dataset
-    print(mean, std)
-    dataset = normalize(cac_dataset, mean, std)
+    #mean, std = mean_std(cac_dataset)
+    mean, std = [0.5719], [0.2098] 
+    #print(mean, std)
+    #dataset = normalize(cac_dataset, mean, std)
 
     
     test_loader = torch.utils.data.DataLoader(cac_dataset,
@@ -195,5 +251,6 @@ if __name__ == '__main__':
             masks = torch.nn.functional.softmax(output, dim=1)[0]
 
             bounding_box(batch_idx, img, masks)
-            print(batch_idx)
+            if batch_idx == 40:
+                break
 
