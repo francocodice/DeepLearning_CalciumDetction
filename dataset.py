@@ -8,13 +8,12 @@ import pydicom
 import numpy as np
 import sqlite3
 from utils import convert
-from pydicom.pixel_data_handlers.util import apply_modality_lut, apply_windowing
+from pydicom.pixel_data_handlers.util import  apply_windowing
 from utils import *
-from transform import *
 
 
 class CalciumDetection(torch.utils.data.Dataset):
-    def __init__(self, data_dir, labels_path, transform=None):
+    def __init__(self, data_dir, labels_path, transform=None, require_path_file=False):
         self.root = data_dir
         self.elem = glob.glob(self.root + '*' + '/rx/')
 
@@ -24,6 +23,7 @@ class CalciumDetection(torch.utils.data.Dataset):
 
         self.labels = [dict(row) for row in cursor.execute('SELECT * FROM patient').fetchall()]
         self.transform = transform
+        self.require_path_file = require_path_file
 
 
     def __len__(self):
@@ -53,8 +53,12 @@ class CalciumDetection(torch.utils.data.Dataset):
             img = torchvision.transforms.ToTensor()(img)
 
         #print(f'{path} label {label}')
+        # im.thumbnail((512, 512), Image.NEAREST)
 
-        return img, label
+        if self.require_path_file:
+            return img, path, label
+        else:
+            return img, label
 
 
 if __name__ == '__main__':

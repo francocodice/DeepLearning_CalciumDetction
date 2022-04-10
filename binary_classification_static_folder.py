@@ -3,17 +3,36 @@ import dataset
 import seaborn as sns
 from utils import *
 import model
-import copy
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from model import *
 from torch.optim.lr_scheduler import StepLR
-from transform import *
+import torchvision.transforms as transforms
 
 SIZE_IMAGE = 1024
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 path_plot = '/home/fiodice/project/plot_transform/sample'
+
+
+def get_transforms(img_size, crop, mean, std):
+    train_transforms = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.RandomRotation(degrees=15),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+    
+    return train_transforms, test_transform
+
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc = 0., 0.
@@ -53,19 +72,15 @@ if __name__ == '__main__':
     path_labels = '/home/fiodice/project/dataset/site.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
+    batchsize = 4
     mean, std = [0.5024], [0.2898]
     train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
-
-    # Normalization here decrese accuracy of the model and precision 
-    # of mean, std overall the dataset.
 
     train_set = dataset.CalciumDetection(path_train_data, path_labels, transform=train_t)
     test_set = dataset.CalciumDetection(path_test_data, path_labels, transform=test_t)
 
     model = load_densenet(path_model)
     model.to(device)
-
-    batchsize = 4
 
     train_loader = torch.utils.data.DataLoader(train_set,
                                             batch_size=batchsize,
@@ -77,8 +92,8 @@ if __name__ == '__main__':
                                             shuffle=False,
                                             num_workers=0)
 
-    show_distribution(train_loader, 'train')
-    show_distribution(test_loader, 'test')
+    #show_distribution(train_loader, 'train')
+    #show_distribution(test_loader, 'test')
 
     best_model = None
     best_loss = 1.
@@ -94,17 +109,13 @@ if __name__ == '__main__':
     #criterion = torch.nn.BCEWithLogitsLoss()
 
     criterion = torch.nn.CrossEntropyLoss()
-    #lr = 1e-3
     lr = 0.001
     weight_decay = 0.0001
-    #weight_decay = 1e-4
-
     momentum = 0.8
     epochs = 60
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
-
     #optimizer = torch.optim.Adam(model.fc.parameters(), lr=lr, betas=(0.8, 0.999), eps=1e-08, weight_decay=weight_decay)
-    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True, factor=0.05)
+    
     scheduler = StepLR(optimizer, step_size=20, gamma=0.95)
 
     print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize}')
@@ -143,9 +154,6 @@ if __name__ == '__main__':
 
     print(f'Best model test accuracy: {best_test_acc}')
     print(f'Best model test loss: {best_test_loss}')
-
-    #print(f'True Labels {true_labels}')
-    #print(f'Pred Labels {best_pred_labels}')
 
     #### Confusion Matrix ####
     cm = confusion_matrix(true_labels, best_pred_labels)

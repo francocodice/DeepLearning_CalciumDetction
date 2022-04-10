@@ -2,8 +2,10 @@ import pydicom as dcm
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import torchvision.transforms.functional as F
 from tqdm import tqdm, trange
 import collections
+import PIL
 
 IDX_IMG = 0
 IDX_LABEL = 1
@@ -79,6 +81,23 @@ def windowing(img, window_center, window_width, intercept=0, slope=1):
 
     return img
 
+
+def show(imgs, name_file, path):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    _, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+    for i, img in enumerate(imgs):
+        if type(img) == torch.tensor:
+            img = img.detach()
+        if type(img) != PIL.Image.Image:
+            img = F.to_pil_image(img)
+        #axs[0, i].imshow(np.asarray(img))
+        axs[0, i].imshow(np.asarray(img), cmap='gray')
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+    plt.tight_layout()
+    plt.savefig(path + name_file + '.png')
+    plt.close()
+
   
 def windowing_param(data):
     w_param = [data[('0028','1050')].value, #window center
@@ -89,38 +108,3 @@ def windowing_param(data):
 def to_int(x):
     if type(x) == dcm.multival.MultiValue: return int(x[0])
     else: return int(x)
-
-
-
-# No more used
-
-def increase_dataset(training_set, factor = 6):
-    train_transform = train_transforms()
-    tensor_transforms = tensor_transform()
-    augmented_dataset = []
-
-    print('='*15, f'Augmentation','='*15)
-
-    for j in trange((len(training_set))):
-        # make a copy of each img without transform
-        label = training_set[j][IDX_LABEL]
-        base_transform = tensor_transforms(training_set[j][IDX_IMG])
-        # to lose less information copy before cast to tensor
-        augmented_dataset.append((base_transform,label))
-
-        # if label 1 or 2 make factor copy of each img
-        if label == 1  or label == 2:
-
-            for k in range(factor):
-                transformed_image =  (training_set[j][IDX_IMG])
-                augmented_dataset.append((transformed_image,label))
-
-                #if k == 3: plot_data(path_plot, base_transform, transformed_image, j)
-        
-        # if label 1 or 2 make one copy of each img
-        elif label == 0 or label == 3:
-
-            transformed_image = train_transform(training_set[j][IDX_IMG])
-            augmented_dataset.append((transformed_image,label))
-
-    return augmented_dataset

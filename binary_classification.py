@@ -7,8 +7,6 @@ import copy
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from model import *
-from torch.optim.lr_scheduler import StepLR
-from transform import *
 
 SIZE_IMAGE = 1024
 
@@ -58,9 +56,9 @@ if __name__ == '__main__':
     #path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    transform = transforms.Compose([ transforms.Resize((1248,1248)),
-                                     transforms.CenterCrop(SIZE_IMAGE),
-                                     transforms.ToTensor()])
+    transform = torchvision.transforms.Compose([ torchvision.transforms.Resize((1248,1248)),
+                                     torchvision.transforms.CenterCrop(SIZE_IMAGE),
+                                     torchvision.transforms.ToTensor()])
 
     cac_dataset = dataset.CalciumDetection(path_train_data, path_labels, transform)
 
