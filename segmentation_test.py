@@ -4,6 +4,9 @@ from utils import *
 from model import UNet
 from torchvision import transforms
 
+
+####### NO MORE USED ############
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 path_plot = '/home/fiodice/project/example_segmentation/seg'

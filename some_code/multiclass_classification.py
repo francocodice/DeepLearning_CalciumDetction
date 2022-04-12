@@ -5,11 +5,10 @@ import dataset
 import copy
 import matplotlib.pyplot as plt
 from utils import *
-from project.src.transform import *
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 
-
+####### NO MORE USED ############
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -98,8 +97,8 @@ if __name__ == '__main__':
     #train_dataset = augmentation.increase_dataset(t_dataset)
 
     ####### Normalization ############
-    mean, std = mean_std(train_dataset)
-    dataset_norm = normalize(train_dataset, mean, std)
+    mean, std = mean_std(t_dataset)
+    dataset_norm = normalize(test_set, mean, std)
 
     # Check norm
     print(f'Mean {mean} \nStd {std} before Normalization\n')

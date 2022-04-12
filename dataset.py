@@ -37,8 +37,6 @@ class CalciumDetection(torch.utils.data.Dataset):
         #w_center, w_width = windowing_param(dimg) 
         #img16 = windowing(hu, w_center, w_width)
 
-        #print(f'Img {os.listdir(self.elem[idx])[0]} Min {img16.min()} Max {img16.max()}')
-
         img8 = convert(img16, 0, 255, np.uint8)
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
@@ -52,9 +50,6 @@ class CalciumDetection(torch.utils.data.Dataset):
         else:
             img = torchvision.transforms.ToTensor()(img)
 
-        #print(f'{path} label {label}')
-        # im.thumbnail((512, 512), Image.NEAREST)
-
         if self.require_path_file:
             return img, path, label
         else:
@@ -65,9 +60,9 @@ if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset_split/test/'
     path_labels = '/home/fiodice/project/dataset/site.db'
 
-    transform = transforms.Compose([ transforms.Resize((1248,1248)),
-                                     transforms.CenterCrop(1024),
-                                     transforms.ToTensor()])
+    transform = torchvision.Compose([ torchvision.transforms.Resize((1248,1248)),
+                                     torchvision.transforms.CenterCrop(1024),
+                                     torchvision.transforms.ToTensor()])
 
     dataset = CalciumDetection(path_data, path_labels, transform=transform)
     

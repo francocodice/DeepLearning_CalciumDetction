@@ -1,11 +1,17 @@
+import torch
+import collections
+import PIL
+
 import pydicom as dcm
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
 import torchvision.transforms.functional as F
+import seaborn as sns
+import pandas as pd 
+
 from tqdm import tqdm, trange
-import collections
-import PIL
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import roc_curve, auc
 
 IDX_IMG = 0
 IDX_LABEL = 1
@@ -47,10 +53,18 @@ def split_train_val(size_train, dataset):
     return torch.utils.data.random_split(dataset, [train_size,test_size])
 
 
-def show_distribution(dataloader, set):
+def show_distribution(dataloader, set, path_plot):
     batch_labels = [label.tolist() for _, label in dataloader]
     label_flat_list = [item for sublist in batch_labels for item in sublist]
     count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
+    
+    val_samplesize = pd.DataFrame.from_dict(
+    {'0': [count_labels[0]], 
+     '> 10': count_labels[1],
+    })
+
+    sns.barplot(data=val_samplesize)
+    plt.savefig(path_plot + str(set) + '.png')
     print(f'For {set} Labels {count_labels}')
 
 
@@ -105,6 +119,41 @@ def windowing_param(data):
                     
     return to_int(w_param[0]),to_int(w_param[1])
 
+
 def to_int(x):
     if type(x) == dcm.multival.MultiValue: return int(x[0])
     else: return int(x)
+
+
+def save_losses(train_losses, test_losses, path_plot):
+    plt.figure(figsize=(16, 8))
+    plt.plot(train_losses, label='Train loss')
+    plt.plot(test_losses, label='Test loss')
+    plt.legend()
+    plt.savefig(path_plot  + 'losses.png')
+    plt.close()
+
+
+def save_cm(true_labels, best_pred_labels, path_plot):
+    cm = confusion_matrix(true_labels, best_pred_labels)
+    ax = sns.heatmap(cm, annot=True, fmt="d")
+    hm = ax.get_figure()
+    hm.savefig(path_plot + 'cm.png')
+    hm.clf()
+    plt.close(hm)
+
+
+def save_roc_curve(true_labels, max_probs, path_plot):
+    fpr, tpr, _ = roc_curve(true_labels, max_probs, pos_label=1)
+    roc_auc = auc(fpr, tpr)
+    plt.figure(1)
+    lw = 2
+    plt.plot(fpr, tpr, color="darkorange", label='AUC = %0.2f' % roc_auc)
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve')
+    plt.legend(loc="lower right")
+    plt.savefig(path_plot  + 'roc.png')
