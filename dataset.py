@@ -57,10 +57,10 @@ class CalciumDetection(torch.utils.data.Dataset):
 
 
 if __name__ == '__main__':
-    path_data = '/home/fiodice/project/dataset_split/test/'
+    path_data = '/home/fiodice/project/dataset_split/train/'
     path_labels = '/home/fiodice/project/dataset/site.db'
 
-    transform = torchvision.Compose([ torchvision.transforms.Resize((1248,1248)),
+    transform = torchvision.transforms.Compose([ torchvision.transforms.Resize((1248,1248)),
                                      torchvision.transforms.CenterCrop(1024),
                                      torchvision.transforms.ToTensor()])
 

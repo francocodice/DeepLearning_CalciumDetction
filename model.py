@@ -213,7 +213,7 @@ def load_densenet(path_model):
     return model
 
 
-def load_densenet_mpl(path_model):
+def load_densenet_mlp(path_model):
     model = HierarchicalResidual(encoder='densenet121')
     dict_model = torch.load(path_model)["model"]
     model.load_state_dict(dict_model)

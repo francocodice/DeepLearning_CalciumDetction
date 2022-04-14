@@ -15,8 +15,8 @@ from torchvision.ops import *
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-OUTPUT_FOLDER_TRAIN = '/home/fiodice/project/dataset_png/train/'
-OUTPUT_FOLDER_TEST = '/home/fiodice/project/dataset_png/test/'
+OUTPUT_FOLDER_TRAIN = '/home/fiodice/project/dataset_png2/train/'
+OUTPUT_FOLDER_TEST = '/home/fiodice/project/dataset_png2/test/'
 
 PATH_PLOT = '/home/fiodice/project/plot_bounding_box/'
 
@@ -38,7 +38,7 @@ def bounding_box(cac_id, img, masks, scale_factor, visualize=False):
     masks = torch.argmax(masks, dim=0, keepdim=True).type(torch.long)
     masks = masks == obj_ids[:, None, None]
 
-    mask_heart = dilate_heart_maskv(masks[0].int(), 
+    mask_heart = dilate_heart_mask(masks[0].int(), 
                                     cac_id, 
                                     visualize=visualize)
 
@@ -80,15 +80,15 @@ def crop_boxes(boxes):
 
     c_boxes[ID_HEART] = boxes[ID_HEART]
     # decrease size of dx lung bounding box
-    c_boxes[ID_LUNG_SX][0] = boxes[ID_LUNG_SX][0] + (perc_width_lung_sx * 35) 
+    c_boxes[ID_LUNG_SX][0] = boxes[ID_LUNG_SX][0] + (perc_width_lung_sx * 20) 
     c_boxes[ID_LUNG_SX][1] = boxes[ID_LUNG_SX][1] + (perc_height_lung_sx * 10)
     c_boxes[ID_LUNG_SX][2] = boxes[ID_LUNG_SX][2]
-    c_boxes[ID_LUNG_SX][3] = boxes[ID_LUNG_SX][3] - (perc_height_lung_sx * 15) 
+    c_boxes[ID_LUNG_SX][3] = boxes[ID_LUNG_SX][3] - (perc_height_lung_sx * 10) 
     # decrease size of dx lung bounding box
     c_boxes[ID_LUNG_DX][0] = boxes[ID_LUNG_DX][0]
     c_boxes[ID_LUNG_DX][1] = boxes[ID_LUNG_DX][1] + (perc_height_lung_dx * 10) 
-    c_boxes[ID_LUNG_DX][2] = boxes[ID_LUNG_DX][0] + (perc_width_lung_dx * 65) 
-    c_boxes[ID_LUNG_DX][3] = boxes[ID_LUNG_DX][3] - (perc_height_lung_dx * 15) 
+    c_boxes[ID_LUNG_DX][2] = boxes[ID_LUNG_DX][2] - (perc_width_lung_dx * 20) 
+    c_boxes[ID_LUNG_DX][3] = boxes[ID_LUNG_DX][3] - (perc_height_lung_dx * 10) 
 
     #print(f'For left lungh W :{perc_width_lung_sx * 100}, H {perc_height_lung_sx * 100}')
     #print(f'For right lungh W :{perc_width_lung_dx * 100}, H {perc_height_lung_dx * 100}')
@@ -100,7 +100,7 @@ def dicom_img(path):
     img16 = apply_windowing(dimg.pixel_array, dimg)   
     img8 = convert(img16, 0, 255, np.uint8)
     img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
-    return Image.fromarray(img_array)
+    return Image.fromarray(img_array), dimg.PatientID
 
 
 def rgb_img(tensor):
@@ -119,6 +119,9 @@ if __name__ == '__main__':
     path_labels = '/home/fiodice/project/dataset/site.db'
     path_model = '/home/fiodice/project/model/segmentation_model.pt'
 
+    # Mean and Std of CAC dataset
+    mean, std = [0.5719], [0.2098] 
+    # Not normalize because decrese a lot the quality of masks
     transform = torchvision.transforms.Compose([ torchvision.transforms.Resize((SIZE_IMAGE,SIZE_IMAGE)),
                                                 torchvision.transforms.ToTensor()])
 
@@ -131,11 +134,8 @@ if __name__ == '__main__':
     model.eval()
     model.to(device)
 
-    mean, std = [0.5719], [0.2098] 
-    #dataset = normalize(cac_dataset, mean, std)
-
-    # heart_box for img 512 x 512 to apply at 2048 x 2048
-    scale_factor = 4.2
+    # heart_box for img 512 x 512 to apply at 2048 x 2048, scale_factor = 4
+    scale_factor = 4.0
     visualize=False
     to_tensor = torchvision.transforms.ToTensor()
 
@@ -156,20 +156,22 @@ if __name__ == '__main__':
             data, labels = data.to(device), labels.to(device)
             output = model(data)
 
+            # One sample for batch
             img = data[0]
             masks = torch.nn.functional.softmax(output, dim=1)[0]
             path_data = path[0]
 
-            cac_id =  path_data.split('/')[-3]
+            dimg, cac_id = dicom_img(path_data)         
             shadow_heart_box = bounding_box(cac_id, img, masks, scale_factor, visualize=visualize) 
 
-            dimg = dicom_img(path_data)         
-            dimg.thumbnail((2048, 2048), Image.ANTIALIAS)
+            #dimg.thumbnail((2048, 2048), Image.ANTIALIAS)
+            dimg = dimg.resize((2048, 2048))
+
             img_cropped = dimg.crop(tuple_box(shadow_heart_box))
 
             if visualize:
                 plot_result = [dimg, 
-                            draw_bounding_boxes(rgb_img(to_tensor(dimg)), shadow_heart_box, colors="red", width=10),
+                            draw_bounding_boxes(rgb_img(to_tensor(dimg)), shadow_heart_box, colors="red", width=8),
                             img_cropped]
                 show(plot_result, str(cac_id) + '_crop', path=PATH_PLOT)
 
@@ -178,8 +180,4 @@ if __name__ == '__main__':
             else:
                 img_cropped.save(OUTPUT_FOLDER_TEST + cac_id + '.png')
 
-            print(f'Saved {cac_id} with dim {img_cropped.size}')
-
-            if batch_idx == 1:
-                break
-
+            print(f'Saved {cac_id} with dim {img_cropped.size} .. N : {batch_idx}')

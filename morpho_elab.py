@@ -14,19 +14,21 @@ def multi_dil(im, num, elem):
     return im
 
 
-## Opening -> Closing --> Multi Dilatation
-def dilate_heart_maskv(mask, cac_id, visualize=False):
+## Opening -> Dilatation -> Closing --> Multi Dilatation
+def dilate_heart_mask(mask, cac_id, visualize=False):
     new_mask = np.zeros(mask.shape).astype(np.uint8)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(12,12))
 
     n_regions, _ = cv2.connectedComponents(mask.cpu().numpy().astype(np.uint8), 8)
 
+    # if net not inferred heart shadow heart, put a circle a the center of image
     if n_regions == 1:
         new_mask[disk((256, 256), 60)] = 1
         return torch.tensor(new_mask)
     else:
         # small erosion for remove noise 
         open_mask = opening(mask.cpu(), kernel)
+        open_mask = multi_dil(open_mask, 1, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(12,12)))
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(open_mask.astype(np.uint8) , 8 , cv2.CV_32S)
         # if after opening there is no more then 2 element only noise mask
         if num_labels == 1:

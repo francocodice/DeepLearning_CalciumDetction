@@ -65,6 +65,7 @@ def show_distribution(dataloader, set, path_plot):
 
     sns.barplot(data=val_samplesize)
     plt.savefig(path_plot + str(set) + '.png')
+    plt.close()
     print(f'For {set} Labels {count_labels}')
 
 
@@ -157,3 +158,4 @@ def save_roc_curve(true_labels, max_probs, path_plot):
     plt.title('ROC curve')
     plt.legend(loc="lower right")
     plt.savefig(path_plot  + 'roc.png')
+    plt.close()

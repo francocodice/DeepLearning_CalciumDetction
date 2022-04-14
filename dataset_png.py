@@ -25,15 +25,19 @@ class CalciumDetectionPNG(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         path = self.elem[idx] 
-        cac_id = path.split('/')[-1].split('.')[-2]
-        img = Image.open(path).convert('L')
+        cac_id = path.split('/')[-1].split('.png')[-2]
+        dimg = Image.open(path).convert('L')
+        #dimg = Image.open(path).convert('RGB')
+
         cac_score = [label for label in self.labels if label['id'] == cac_id][0]['cac_score']
+
+        #cac_score = [label for label in self.labels if label['id'] == cac_id][0]['cac_score']
         label = 0 if int(cac_score) in range(0, 11) else 1
 
         if self.transform is not None:
-            img = self.transform(img=img)
+            img = self.transform(img=dimg)
         else:
-            img = torchvision.transforms.ToTensor()(img)
+            img = torchvision.transforms.ToTensor()(dimg)
 
         return img, label
 
