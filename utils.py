@@ -6,6 +6,7 @@ import pydicom as dcm
 import numpy as np
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as F
+import torchvision.transforms as transforms
 import seaborn as sns
 import pandas as pd 
 
@@ -47,6 +48,24 @@ def normalize(dataset, mean, std):
     return dataset_norm
 
 
+def get_transforms(img_size, crop, mean, std):
+    train_transforms = transforms.Compose([
+        transforms.RandomRotation(degrees=15),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+    
+    return train_transforms, test_transform
+
+
 def split_train_val(size_train, dataset):
     train_size = int(size_train * len(dataset))
     test_size = len(dataset) - train_size
@@ -59,8 +78,8 @@ def show_distribution(dataloader, set, path_plot):
     count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
     
     val_samplesize = pd.DataFrame.from_dict(
-    {'0': [count_labels[0]], 
-     '> 10': count_labels[1],
+    {'[0:100]': [count_labels[0]], 
+     '> 100': count_labels[1],
     })
 
     sns.barplot(data=val_samplesize)
@@ -126,8 +145,9 @@ def to_int(x):
     else: return int(x)
 
 
-def save_losses(train_losses, test_losses, path_plot):
+def save_losses(train_losses, test_losses, best_test_acc, path_plot):
     plt.figure(figsize=(16, 8))
+    plt.title(f'Best accuracy : {best_test_acc:.4f}')
     plt.plot(train_losses, label='Train loss')
     plt.plot(test_losses, label='Test loss')
     plt.legend()

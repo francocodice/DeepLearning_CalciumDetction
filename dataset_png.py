@@ -27,7 +27,6 @@ class CalciumDetectionPNG(torch.utils.data.Dataset):
         path = self.elem[idx] 
         cac_id = path.split('/')[-1].split('.png')[-2]
         dimg = Image.open(path).convert('L')
-        #dimg = Image.open(path).convert('RGB')
 
         cac_score = [label for label in self.labels if label['id'] == cac_id][0]['cac_score']
 
