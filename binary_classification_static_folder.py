@@ -1,7 +1,6 @@
 import torch
 import dataset
 import copy
-import dataset_png
 from tqdm import tqdm
 from utils import *
 from model import *
@@ -12,6 +11,7 @@ import torch.nn.functional as F
 SIZE_IMAGE = 1024
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
+mean, std = [0.5024], [0.2898]
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def get_transforms(img_size, crop, mean, std):
@@ -34,7 +34,6 @@ def get_transforms(img_size, crop, mean, std):
     return train_transforms, test_transform
 
 
-# add label wrong
 def show_wrong_classified(best_pred_labels, true_labels, test_set):
     res = best_pred_labels == true_labels
     for id, (data, label) in enumerate(test_set):
@@ -92,12 +91,7 @@ if __name__ == '__main__':
     path_model = '/home/fiodice/project/model/final.pt'
 
     batchsize = 4
-    # Mean and Std of ChestXpert dataset
-    mean, std = [0.5024], [0.2898]
-    # Transform for original image
     train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
-    # Transform for cropped image
-    #train_t, test_t = get_transforms(img_size=1048, crop=1024, mean = mean, std = std)
 
     train_set = dataset.CalciumDetection(path_train_data, path_labels, transform=train_t)
     test_set = dataset.CalciumDetection(path_test_data, path_labels, transform=test_t)
@@ -116,7 +110,7 @@ if __name__ == '__main__':
                                             shuffle=False,
                                             num_workers=0)
 
-    show_distribution(train_loader, 'train', PATH_PLOT)
+    #show_distribution(train_loader, 'train', PATH_PLOT)
     #show_distribution(test_loader, 'test', PATH_PLOT)
 
     best_model = None
@@ -135,17 +129,15 @@ if __name__ == '__main__':
     lr = 0.001
     weight_decay = 0.0001
     momentum = 0.8
-    epochs = 40
+    epochs = 45
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
-    
-    #scheduler = StepLR(optimizer, step_size=8, gamma=0.1)
-    scheduler = None
+    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
 
-    print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize}')
+    print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize} scheduler {scheduler}')
     
     train_losses,test_losses  = [], []
     for epoch in range(1, epochs+1):
-        print('='*15, f'Epoch: {epoch}','='*15)
+        print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
 
         train_loss, train_acc, _, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
         test_loss, test_acc, true_labels, pred_labels, max_probs = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
@@ -170,6 +162,5 @@ if __name__ == '__main__':
 
     save_losses(train_losses, test_losses, best_test_acc, PATH_PLOT)
     save_cm(true_labels, best_pred_labels, PATH_PLOT)
-    save_roc_curve(true_labels, best_prob_labels, PATH_PLOT)
-
-    #show_wrong_classified(best_pred_labels, true_labels, test_set)
+    #save_roc_curve(true_labels, best_prob_labels, PATH_PLOT)
+    show_wrong_classified(best_pred_labels, true_labels, test_set)

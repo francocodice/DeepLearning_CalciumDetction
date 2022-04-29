@@ -9,13 +9,13 @@ from torchvision import transforms
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-path_plot = '/home/fiodice/project/example_segmentation/seg'
+path_plot = '/home/fiodice/project/plot_seg/'
 
-def decode_segmap(seg_mask, nc=4):
+def decode_segmap(seg_mask, nc=6):
     label_colors = np.array([(128, 0, 128),     # 0 (fucsia) = heart
-                             #(128, 0, 0),       # 1 (red)= right clavicle
+                             (128, 0, 0),       # 1 (red)= right clavicle
                              (0, 128, 0),       # 2 (green)= right lung
-                             #(128, 128, 0),     # 3 (yellow) = left clavicle
+                             (128, 128, 0),     # 3 (yellow) = left clavicle
                              (0, 0, 128),       # 4 (blue) = left lung
                              (0, 0, 0)])        # 5 (black) -> background
 
@@ -54,8 +54,8 @@ def show_samples_seg(count, input, output):
 
 if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset/'
-    #path_model = '/home/fiodice/project/model/segmentation_model.pt'
-    path_model = '/home/fiodice/project/model/segmentation_model_fi.pt'
+    path_model = '/home/fiodice/project/model/segmentation_model.pt'
+    #path_model = '/home/fiodice/project/model/segmentation_model_fi.pt'
     path_labels = '/home/fiodice/project/dataset/site.db'
 
     transform = transforms.Compose([ transforms.Resize((512,512)),
@@ -64,20 +64,20 @@ if __name__ == '__main__':
     data = CalciumDetection(path_data, path_labels, transform=transform)
 
 
-    model = UNet(in_channels=1, out_channels=4, init_features=32)
+    model = UNet(in_channels=1, out_channels=6, init_features=32)
 
     model.load_state_dict(torch.load(path_model, map_location=device))
     model.eval()
     model.to(device)
 
-    mean, std = mean_std(data)
+    #mean, std = mean_std(data)
     #mean, std = [0.5884], [0.1927]
     #print(mean, std)
-    dataset = normalize(data, mean, std)
+    #dataset = normalize(data, mean, std)
 
     
     test_loader = torch.utils.data.DataLoader(data,
-                                            batch_size=4,
+                                            batch_size=1,
                                             shuffle=False,
                                             num_workers=0)
 

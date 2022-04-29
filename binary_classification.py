@@ -1,18 +1,16 @@
 import torch
 import dataset
-import seaborn as sns
-from utils import *
 import model
 import copy
 from tqdm import tqdm
-from sklearn.metrics import confusion_matrix
 from model import *
+from utils import *
 
 SIZE_IMAGE = 1024
+PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-path_plot = '/home/fiodice/project/plot_transform/sample'
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc = 0., 0.
@@ -53,7 +51,6 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 if __name__ == '__main__':
     path_train_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/dataset/site.db'
-    #path_plot = '/home/fiodice/project/plot_transform/sample'
     path_model = '/home/fiodice/project/model/final.pt'
 
     transform = torchvision.transforms.Compose([ torchvision.transforms.Resize((1248,1248)),
@@ -66,7 +63,7 @@ if __name__ == '__main__':
     # Test set : 75%
     # Train set : 77%  
 
-    model = load_densenet(path_model)
+    model = load_densenet_mse(path_model)
     model.to(device)
 
     size_train = 0.80
@@ -109,11 +106,8 @@ if __name__ == '__main__':
     #criterion = torch.nn.BCEWithLogitsLoss()
 
     criterion = torch.nn.CrossEntropyLoss()
-    #lr = 1e-3
     lr = 0.001
     weight_decay = 0.0001
-    #weight_decay = 1e-4
-
     momentum = 0.8
     epochs = 80
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
@@ -144,28 +138,9 @@ if __name__ == '__main__':
 
     torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray.pt')
 
-    #evalute_model(train_losses, test_losses, path_plot)
-    #save_cm(true_labels, best_pred_labels, path_plot)
-    print(f'Best test loss: {best_test_loss}, Best test accuracy: {best_test_acc}')
-
-    plt.figure(figsize=(16, 8))
-    plt.plot(train_losses, label='Train loss')
-    plt.plot(test_losses, label='Test loss')
-    plt.legend()
-    plt.savefig(path_plot  + 'res.png')
-    plt.close()
 
     print(f'Best model test accuracy: {best_test_acc}')
     print(f'Best model test loss: {best_test_loss}')
 
-    #print(f'True Labels {true_labels}')
-    #print(f'Pred Labels {best_pred_labels}')
-
-    #### Confusion Matrix ####
-    cm = confusion_matrix(true_labels, best_pred_labels)
-    print(cm)
-    ax = sns.heatmap(cm, annot=True, fmt="d")
-    hm = ax.get_figure()
-    hm.savefig(path_plot)
-    hm.clf()
-    plt.close(hm)
+    save_losses(train_losses, test_losses, PATH_PLOT)
+    save_cm(true_labels, best_pred_labels, PATH_PLOT)

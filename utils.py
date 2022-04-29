@@ -13,9 +13,15 @@ import pandas as pd
 from tqdm import tqdm, trange
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_curve, auc
+from pydicom.pixel_data_handlers.util import  apply_windowing
+from PIL import Image
+from skimage import exposure
+
 
 IDX_IMG = 0
 IDX_LABEL = 1
+
+## dataset utils
 
 def mean_std(dataset):
     loader = torch.utils.data.DataLoader(dataset,
@@ -72,20 +78,15 @@ def split_train_val(size_train, dataset):
     return torch.utils.data.random_split(dataset, [train_size,test_size])
 
 
-def show_distribution(dataloader, set, path_plot):
-    batch_labels = [label.tolist() for _, label in dataloader]
-    label_flat_list = [item for sublist in batch_labels for item in sublist]
-    count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
-    
-    val_samplesize = pd.DataFrame.from_dict(
-    {'[0:100]': [count_labels[0]], 
-     '> 100': count_labels[1],
-    })
+## dicom utils
 
-    sns.barplot(data=val_samplesize)
-    plt.savefig(path_plot + str(set) + '.png')
-    plt.close()
-    print(f'For {set} Labels {count_labels}')
+def dicom_img(path):
+    dimg = dcm.dcmread(path, force=True)
+    img16 = apply_windowing(dimg.pixel_array, dimg)   
+    img_eq = exposure.equalize_hist(img16)
+    img8 = convert(img_eq, 0, 255, np.uint8)
+    img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
+    return Image.fromarray(img_array), dimg.PatientID
 
 
 def convert(img, target_type_min, target_type_max, target_type):
@@ -115,6 +116,37 @@ def windowing(img, window_center, window_width, intercept=0, slope=1):
 
     return img
 
+  
+def windowing_param(data):
+    w_param = [data[('0028','1050')].value, #window center
+                data[('0028','1051')].value] #window width
+                    
+    return to_int(w_param[0]),to_int(w_param[1])
+
+
+def to_int(x):
+    if type(x) == dcm.multival.MultiValue: return int(x[0])
+    else: return int(x)
+
+
+## show utils
+
+
+def show_distribution(dataloader, set, path_plot):
+    batch_labels = [label.tolist() for _, label in dataloader]
+    label_flat_list = [item for sublist in batch_labels for item in sublist]
+    count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
+    
+    val_samplesize = pd.DataFrame.from_dict(
+    {'[0:100]': [count_labels[0]], 
+     '> 100': count_labels[1],
+    })
+
+    sns.barplot(data=val_samplesize)
+    plt.savefig(path_plot + str(set) + '.png')
+    plt.close()
+    print(f'For {set} Labels {count_labels}')
+
 
 def show(imgs, name_file, path):
     if not isinstance(imgs, list):
@@ -131,18 +163,6 @@ def show(imgs, name_file, path):
     plt.tight_layout()
     plt.savefig(path + name_file + '.png')
     plt.close()
-
-  
-def windowing_param(data):
-    w_param = [data[('0028','1050')].value, #window center
-                data[('0028','1051')].value] #window width
-                    
-    return to_int(w_param[0]),to_int(w_param[1])
-
-
-def to_int(x):
-    if type(x) == dcm.multival.MultiValue: return int(x[0])
-    else: return int(x)
 
 
 def save_losses(train_losses, test_losses, best_test_acc, path_plot):

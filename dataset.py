@@ -1,4 +1,3 @@
-
 import torch
 from PIL import Image
 import glob
@@ -8,9 +7,10 @@ import pydicom
 import numpy as np
 import sqlite3
 from utils import convert
-from pydicom.pixel_data_handlers.util import  apply_windowing
+from pydicom.pixel_data_handlers.util import  apply_windowing, apply_modality_lut
 from utils import *
 import torchvision.transforms as transforms
+from skimage import exposure
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
@@ -56,8 +56,8 @@ class CalciumDetection(torch.utils.data.Dataset):
         #hu = apply_modality_lut(dimg.pixel_array, dimg)  
         #w_center, w_width = windowing_param(dimg) 
         #img16 = windowing(hu, w_center, w_width)
-
-        img8 = convert(img16, 0, 255, np.uint8)
+        img_eq = exposure.equalize_hist(img16)
+        img8 = convert(img_eq, 0, 255, np.uint8)
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
 
@@ -82,10 +82,20 @@ MAX_CAC_SCORE = 9880
 MEAN_CAC_SCORE = 1255.4615384615386
 STD_CAC_SCORE = 2140.3052723331593
 
+#MEAN_LOG_CAC_SCORE = 3.8316
+#STD_LOG_CAC_SCORE = 3.5604
+
+# after clip
+MEAN_LOG_CAC_SCORE = 3.6504
+STD_LOG_CAC_SCORE = 3.3314
+
 # Normalizzare su dv std and mean
 
-def std(n):
+def to_std(n):
     return (n - MIN_CAC_SCORE)/(MAX_CAC_SCORE - MIN_CAC_SCORE)
+
+def to_norm(n):
+    return (n - MEAN_LOG_CAC_SCORE)/STD_LOG_CAC_SCORE
 
 class CalciumDetectionRegression(torch.utils.data.Dataset):
     def __init__(self, data_dir, labels_path, transform=None):
@@ -107,8 +117,9 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         path = self.elem[idx] + os.listdir(self.elem[idx])[0]
         dimg = pydicom.dcmread(path, force=True)
-        img16 = apply_windowing(dimg.pixel_array, dimg)   
-        img8 = convert(img16, 0, 255, np.uint8)
+        img16 = apply_windowing(dimg.pixel_array, dimg)
+        img_eq = exposure.equalize_hist(img16)
+        img8 = convert(img_eq, 0, 255, np.uint8)
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
 
@@ -120,17 +131,23 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
         else:
             img = torchvision.transforms.ToTensor()(img)
 
-        return img.float(), std(cac_score)
+        #return img.float(), cac_score
+        return img.float(), to_norm(np.log(np.clip([cac_score],a_min=0, a_max=2000) + 1))[0]
 
 
 if __name__ == '__main__':
+    min = (MIN_CAC_SCORE - MEAN_CAC_SCORE) / STD_CAC_SCORE
+    max = (MAX_CAC_SCORE - MEAN_CAC_SCORE) / STD_CAC_SCORE
+    th = (100 - MEAN_CAC_SCORE) / STD_CAC_SCORE
+
+    print(min, max, th)
     path_data = '/home/fiodice/project/dataset_split/train/'
     path_data = '/home/fiodice/project/dataset_split/test/'
 
     path_labels = '/home/fiodice/project/dataset/site.db'
 
     mean, std = [0.5024], [0.2898]
-    train_t, test_t = get_transforms(img_size=1048, crop=1024, mean = mean, std = std)
+    train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
     train = CalciumDetectionRegression(path_data, path_labels, transform=train_t)
     test = CalciumDetectionRegression(path_data, path_labels, transform=test_t)
@@ -158,4 +175,3 @@ if __name__ == '__main__':
     plt.gca().set(title='Frequency Histogram', ylabel='Calcium score')
     plt.savefig(PATH_PLOT + 'hist.png')
     plt.close()
-

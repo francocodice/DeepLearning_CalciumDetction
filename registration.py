@@ -1,28 +1,34 @@
-import pydicom
-import dataset
-import utils
 import skimage
 from dataset import *
-from PIL import Image
 
 import pyelastix
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
-pyelastix.EXES = "/home/fiodice/.local/bin/elastix" 
-
+pyelastix.EXES = ['/home/fiodice/.local/bin/elastix', '/home/fiodice/.local/bin/transformix']
 
 def registration(input, reference):
-	params = pyelastix.get_default_params(type='RIGID')
-	params.NumberOfResolutions = 8
-	params.AutomaticTransformInitialization = True
-	params.AutomaticScalesEstimation = False
-	params.NumberOfHistogramBins = 64
-	params.MaximumStepLength = 5.0
-	params.MaximumNumberOfIterations = 2000
-
-	registered, field = pyelastix.register(input, reference, params)
-	return registered
+    params = pyelastix.get_default_params(type='RIGID')
+    # The number of levels in the image pyramid
+    params.NumberOfResolutions = 4
+    # Scales the affine matrix elements compared to the translations,
+    # to make sure they are in the same range. In general, it's best to
+    # use automatic scales estimation.
+    params.AutomaticScalesEstimation = True
+    # Automatically guess an initial translation by aligning the
+    # geometric centers of the fixed and moving.
+    params.AutomaticTransformInitialization = True
+    # Number of grey level bins in each resolution level,
+    params.NumberOfHistogramBins = 16
+    # The step size of the optimizer, in mm. By default the voxel size is used.
+    # which usually works well. In case of unusual high-resolution images
+    # (eg histology) it is necessary to increase this value a bit, to the size
+    # of the "smallest visible structure" in the image:
+    params.MaximumStepLength = 1
+    params.MaximumNumberOfIterations = 600
+    
+    registered, field = pyelastix.register(input, reference, params)
+    return registered
 
 def dicom_img_c(path):
     dimg = dcm.dcmread(path, force=True)

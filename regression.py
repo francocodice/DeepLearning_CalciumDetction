@@ -1,16 +1,22 @@
 import torch
 import dataset
 import copy
-import dataset_png
 from tqdm import tqdm
 from utils import *
 from model import *
 from torch.optim.lr_scheduler import StepLR
-import torchvision.transforms as transforms
-import torch.nn.functional as F
 
 SIZE_IMAGE = 1024
-THRESHOLD_CAC_SCORE = 0.0102
+# [0;1]
+#THRESHOLD_CAC_SCORE = 0.0102
+# Norm
+#THRESHOLD_CAC_SCORE = -0.5398
+# Log 
+#THRESHOLD_CAC_SCORE = 0.2200653063816593
+# Clip Log 
+THRESHOLD_CAC_SCORE = 0.2895
+
+
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
@@ -18,13 +24,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def to_class(continuos_values, labels):
-    classes_labels = [0 if labels[i] >= THRESHOLD_CAC_SCORE else 1 for i in range(labels.size(dim=0))]
-    output_labels = [0 if continuos_values[i] >= THRESHOLD_CAC_SCORE else 1 for i in range(continuos_values.size(dim=0))]
-    return torch.tensor(classes_labels), torch.tensor(output_labels)
+    classes_labels = [0 if labels[i] <= THRESHOLD_CAC_SCORE else 1 for i in range(labels.size(dim=0))]
+    output_labels = [0 if continuos_values[i] <= THRESHOLD_CAC_SCORE else 1 for i in range(continuos_values.size(dim=0))]
+    return torch.tensor(output_labels), torch.tensor(classes_labels)
 
 
-
-# add label wrong
 def show_wrong_classified(best_pred_labels, true_labels, test_set):
     res = best_pred_labels == true_labels
     for id, (data, label) in enumerate(test_set):
@@ -34,6 +38,15 @@ def show_wrong_classified(best_pred_labels, true_labels, test_set):
             plt.imshow((data.cpu().permute(1, 2, 0).numpy() + mean) * std,cmap=plt.cm.gray)        
             plt.savefig(PATH_PLOT + 'error_'  + str(id) + '.png')
             plt.close()
+
+
+def save_accs(train_accs, test_accs, path_plot):
+    plt.figure(figsize=(16, 8))
+    plt.plot(train_accs, label='Train acc')
+    plt.plot(test_accs, label='Test acc')
+    plt.legend()
+    plt.savefig(path_plot  + 'accs.png')
+    plt.close()
 
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
@@ -110,18 +123,19 @@ if __name__ == '__main__':
 
     criterion = torch.nn.MSELoss()
 
-    lr = 0.005
+    lr = 0.001
     weight_decay = 0.0001
     momentum = 0.8
-    epochs = 50
-    optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
+    epochs = 45
+    optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, momentum=momentum)
     
-    #scheduler = StepLR(optimizer, step_size=15, gamma=0.95)
-    scheduler = None
+    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
+    #scheduler = None
 
-    print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize}')
+    #print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize}')
     
     train_losses,test_losses  = [], []
+    train_accs, test_accs = [],[]
     for epoch in range(1, epochs+1):
         print('='*15, f'Epoch: {epoch}','='*15)
 
@@ -133,6 +147,8 @@ if __name__ == '__main__':
 
         train_losses.append(train_loss)
         test_losses.append(test_loss)
+        train_accs.append(train_acc)
+        test_accs.append(test_acc)
 
         if best_model is None or (test_loss < best_test_loss):
             best_model = copy.deepcopy(model)
@@ -140,13 +156,12 @@ if __name__ == '__main__':
             best_test_acc = test_acc 
             best_pred_labels = pred_labels
 
-    torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray.pt')
-
+    #torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray.pt')
     print(f'Best model test accuracy: {best_test_acc:.4f}')
     print(f'Best model test loss: {best_test_loss:.4f}')
-
+    
     save_losses(train_losses, test_losses, best_test_acc, PATH_PLOT)
+    save_accs(train_accs, test_accs, PATH_PLOT)
     save_cm(true_labels, best_pred_labels, PATH_PLOT)
     #save_roc_curve(true_labels, best_prob_labels, PATH_PLOT)
-
     #show_wrong_classified(best_pred_labels, true_labels, test_set)
