@@ -82,6 +82,9 @@ MAX_CAC_SCORE = 9880
 MEAN_CAC_SCORE = 1255.4615384615386
 STD_CAC_SCORE = 2140.3052723331593
 
+MEAN_CAC_SCORE_CLIP = 622.3462
+STD_CAC_SCORE_CLIP = 820.8487
+
 #MEAN_LOG_CAC_SCORE = 3.8316
 #STD_LOG_CAC_SCORE = 3.5604
 
@@ -89,12 +92,14 @@ STD_CAC_SCORE = 2140.3052723331593
 MEAN_LOG_CAC_SCORE = 3.6504
 STD_LOG_CAC_SCORE = 3.3314
 
-# Normalizzare su dv std and mean
 
 def to_std(n):
     return (n - MIN_CAC_SCORE)/(MAX_CAC_SCORE - MIN_CAC_SCORE)
 
 def to_norm(n):
+    return (n - MEAN_CAC_SCORE_CLIP)/STD_CAC_SCORE_CLIP
+
+def norm_log(n):
     return (n - MEAN_LOG_CAC_SCORE)/STD_LOG_CAC_SCORE
 
 class CalciumDetectionRegression(torch.utils.data.Dataset):
@@ -125,22 +130,26 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
 
         # Manage label                
         cac_score = [label for label in self.labels if label['id'] == dimg.PatientID][0]['cac_score']
+        #cac_norm = to_norm(np.clip([cac_score],a_min=0, a_max=2000))
+        #label = np.log(cac_norm + 1)[0] 
+        cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 1))
+        label = norm_log(cac_log)[0]
 
         if self.transform is not None:
             img = self.transform(img=img)
         else:
             img = torchvision.transforms.ToTensor()(img)
 
-        #return img.float(), cac_score
-        return img.float(), to_norm(np.log(np.clip([cac_score],a_min=0, a_max=2000) + 1))[0]
+        return img.float(), cac_score 
 
 
 if __name__ == '__main__':
-    min = (MIN_CAC_SCORE - MEAN_CAC_SCORE) / STD_CAC_SCORE
-    max = (MAX_CAC_SCORE - MEAN_CAC_SCORE) / STD_CAC_SCORE
-    th = (100 - MEAN_CAC_SCORE) / STD_CAC_SCORE
+    th = np.log(((100 - MEAN_CAC_SCORE_CLIP) / STD_CAC_SCORE_CLIP) + 1)
+    cac_log = np.log((np.clip([100],a_min=0, a_max=2000) + 1))
 
-    print(min, max, th)
+    th = norm_log(cac_log)
+    print(f'TH {th}')
+
     path_data = '/home/fiodice/project/dataset_split/train/'
     path_data = '/home/fiodice/project/dataset_split/test/'
 

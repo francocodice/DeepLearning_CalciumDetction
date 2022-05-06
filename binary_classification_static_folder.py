@@ -1,6 +1,9 @@
 import torch
 import dataset
 import copy
+import random
+import os
+
 from tqdm import tqdm
 from utils import *
 from model import *
@@ -13,6 +16,16 @@ PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 mean, std = [0.5024], [0.2898]
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def set_seed(seed):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(seed)
+
 
 def get_transforms(img_size, crop, mean, std):
     train_transforms = transforms.Compose([
@@ -90,6 +103,9 @@ if __name__ == '__main__':
     path_labels = '/home/fiodice/project/dataset/site.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
+    seed = 2048
+    set_seed(seed)
+
     batchsize = 4
     train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
@@ -129,7 +145,7 @@ if __name__ == '__main__':
     lr = 0.001
     weight_decay = 0.0001
     momentum = 0.8
-    epochs = 45
+    epochs = 30
     optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
     scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
 
@@ -154,7 +170,7 @@ if __name__ == '__main__':
             best_pred_labels = pred_labels
             best_prob_labels = max_probs
 
-    torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray.pt')
+    torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray-seed-{seed}.pt')
 
     #save_cm(true_labels, best_pred_labels, path_plot)
     print(f'Best model test accuracy: {best_test_acc:.4f}')

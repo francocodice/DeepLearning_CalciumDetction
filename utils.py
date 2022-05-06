@@ -1,6 +1,8 @@
 import torch
 import collections
 import PIL
+import random 
+import os
 
 import pydicom as dcm
 import numpy as np
@@ -76,6 +78,17 @@ def split_train_val(size_train, dataset):
     train_size = int(size_train * len(dataset))
     test_size = len(dataset) - train_size
     return torch.utils.data.random_split(dataset, [train_size,test_size])
+
+## seed utils
+
+def set_seed(seed):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(seed)
 
 
 ## dicom utils
@@ -164,6 +177,15 @@ def show(imgs, name_file, path):
     plt.savefig(path + name_file + '.png')
     plt.close()
 
+
+def save_metric(train, test, metric, path_plot):
+    plt.figure(figsize=(16, 8))
+    plt.plot(train, label='Train ' + str(metric))
+    plt.plot(test, label='Test ' + str(metric))
+    plt.legend()
+    plt.savefig(path_plot + str(metric) + '.png')
+    plt.close()
+    
 
 def save_losses(train_losses, test_losses, best_test_acc, path_plot):
     plt.figure(figsize=(16, 8))
