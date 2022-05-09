@@ -97,13 +97,23 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
         return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy(), _
 
 
+def local_copy(dataset):
+    data = []
+    print('='*15, f'Copying dataset','='*15)
+    for j in trange(len(dataset)):
+        label = dataset[j][1]
+        img = dataset[j][0]
+        data.append((img,label))
+    return data
+
+
 if __name__ == '__main__':
     path_train_data = '/home/fiodice/project/dataset_split/train/'
     path_test_data = '/home/fiodice/project/dataset_split/test/'
     path_labels = '/home/fiodice/project/dataset/site.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    seed = 2048
+    seed = 64
     set_seed(seed)
 
     batchsize = 4
@@ -112,8 +122,10 @@ if __name__ == '__main__':
     train_set = dataset.CalciumDetection(path_train_data, path_labels, transform=train_t)
     test_set = dataset.CalciumDetection(path_test_data, path_labels, transform=test_t)
 
-    model = load_densenet_mlp(path_model)
+    train_set = local_copy(train_set)
+    test_set = local_copy(test_set)
 
+    model = load_densenet_mlp(path_model)
     model.to(device)
 
     train_loader = torch.utils.data.DataLoader(train_set,
@@ -179,4 +191,4 @@ if __name__ == '__main__':
     save_losses(train_losses, test_losses, best_test_acc, PATH_PLOT)
     save_cm(true_labels, best_pred_labels, PATH_PLOT)
     #save_roc_curve(true_labels, best_prob_labels, PATH_PLOT)
-    show_wrong_classified(best_pred_labels, true_labels, test_set)
+    #show_wrong_classified(best_pred_labels, true_labels, test_set)

@@ -63,7 +63,7 @@ if __name__ == '__main__':
     # Test set : 75%
     # Train set : 77%  
 
-    model = load_densenet_mse(path_model)
+    model = load_densenet_mlp(path_model)
     model.to(device)
 
     size_train = 0.80
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     mean, std = mean_std(train_set)
     print(mean, std)
-    #mean, std = [0.5957], [0.1841]
+    #mean, std = [0.5458], [0.2584]
 
     train_set = normalize(train_set, mean, std)
     test_set = normalize(test_set, mean, std)
@@ -89,8 +89,8 @@ if __name__ == '__main__':
                                             shuffle=False,
                                             num_workers=0)
 
-    show_distribution(train_loader, 'train')
-    show_distribution(test_loader, 'test')
+    #show_distribution(train_loader, 'train')
+    #show_distribution(test_loader, 'test')
 
     best_model = None
     best_loss = 1.
@@ -124,8 +124,8 @@ if __name__ == '__main__':
         train_loss, train_acc, _, _ = run(model, train_loader, criterion, optimizer)
         test_loss, test_acc, true_labels, pred_labels = run(model, test_loader, criterion, optimizer, phase='test')
         
-        print(f'Train loss: {train_loss}, Train accuracy: {train_acc}')
-        print(f'Test loss: {test_loss}, Test accuracy: {test_acc}\n')
+        print(f'Train loss: {train_loss:.4f}, Train accuracy: {train_acc:.4f}')
+        print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}\n')
         
         train_losses.append(train_loss)
         test_losses.append(test_loss)
@@ -142,5 +142,5 @@ if __name__ == '__main__':
     print(f'Best model test accuracy: {best_test_acc}')
     print(f'Best model test loss: {best_test_loss}')
 
-    save_losses(train_losses, test_losses, PATH_PLOT)
+    save_losses(train_losses, test_losses, best_test_acc, PATH_PLOT)
     save_cm(true_labels, best_pred_labels, PATH_PLOT)

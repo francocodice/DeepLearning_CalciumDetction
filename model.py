@@ -214,7 +214,7 @@ def load_densenet(path_model):
 
 
 
-def load_densenet_class(path_model):
+def test_calcium_det(path_model):
     model = HierarchicalResidual(encoder='densenet121')
     dict_model = torch.load(path_model)["model"]
 
@@ -229,6 +229,7 @@ def load_densenet_class(path_model):
     model.load_state_dict(dict_model)
 
     return model
+
 
 def load_densenet_mlp(path_model):
     model = HierarchicalResidual(encoder='densenet121')
@@ -251,10 +252,6 @@ def load_densenet_mlp(path_model):
         param.requires_grad = True
     
     return model
-
-
-
-
 
 
 def load_densenet_mse(path_model):

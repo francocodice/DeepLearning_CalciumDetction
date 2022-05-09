@@ -56,39 +56,12 @@ def normalize(dataset, mean, std):
     return dataset_norm
 
 
-def get_transforms(img_size, crop, mean, std):
-    train_transforms = transforms.Compose([
-        transforms.RandomRotation(degrees=15),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-
-    test_transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-    
-    return train_transforms, test_transform
-
-
 def split_train_val(size_train, dataset):
     train_size = int(size_train * len(dataset))
     test_size = len(dataset) - train_size
     return torch.utils.data.random_split(dataset, [train_size,test_size])
 
 ## seed utils
-
-def set_seed(seed):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.manual_seed(seed)
 
 
 ## dicom utils

@@ -19,13 +19,34 @@ def ensable_choise(outputs):
         res[i] = np.bincount(output_i).argmax()
     return res
 
+
+def get_transforms(img_size, crop, mean, std):
+    train_transforms = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        #transforms.RandomRotation(degrees=15),
+        #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+    
+    return train_transforms, test_transform
+
+
 if __name__ == '__main__':
-    path_test_data = '/home/fiodice/project/dataset_split/test/'
+    path_test_data = '/home/fiodice/project/dataset_split/train/'
     path_labels = '/home/fiodice/project/dataset/site.db'
     models = []
 
     for model_state_dict in os.listdir(PATH_MODELS):
-        model = load_densenet_class(PATH_MODELS + model_state_dict)
+        model = test_calcium_det(PATH_MODELS + model_state_dict)
         model.to(device)
         models.append(model)
     
@@ -54,7 +75,9 @@ if __name__ == '__main__':
                 outputs.append(preds.cpu())
             #print(f'Current ensable_labels {ensable_labels}')
             true_labels.append(labels.detach().cpu())
+            #print(outputs)
             pred_labels.append(torch.tensor(ensable_choise(outputs)))
+            #print(ensable_choise(outputs))
 
             acc += torch.sum(preds == labels.data)
             samples_num += len(labels)
