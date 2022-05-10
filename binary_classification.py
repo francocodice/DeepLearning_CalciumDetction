@@ -50,7 +50,7 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 
 if __name__ == '__main__':
     path_train_data = '/home/fiodice/project/dataset/'
-    path_labels = '/home/fiodice/project/dataset/site.db'
+    path_labels = '/home/fiodice/project/dataset/labels_new.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
     transform = torchvision.transforms.Compose([ torchvision.transforms.Resize((1248,1248)),

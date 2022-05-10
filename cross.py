@@ -3,6 +3,9 @@ import dataset
 import copy
 
 from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score
+from collections import Counter
+
 from torch.optim.lr_scheduler import StepLR
 
 from utils import *
@@ -85,7 +88,7 @@ def reset_weights(m):
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc, samples_num = 0., 0., 0.
-    true_labels, pred_labels, outputs_labels = [], [], []
+    true_labels, pred_labels = [], []
     
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
@@ -98,7 +101,6 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 
         true_labels.append(labels.detach().cpu())
         pred_labels.append(preds.detach().cpu())
-        outputs_labels.append(outputs.detach().cpu())
         
         if phase == 'train':
             loss.backward()
@@ -110,7 +112,6 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 
     if scheduler is not None and phase == 'train':
         scheduler.step()
-
     
     return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy()
 
@@ -121,13 +122,14 @@ if __name__ == '__main__':
     path_model = '/home/fiodice/project/model/final.pt'
 
     seed = 42
-    set_seed(seed)
-
     k_folds = 5
-    epochs = 40
+    epochs = 36
     batchsize = 4
+
     results = {}
     mean, std = [0.5024], [0.2898]
+
+    set_seed(seed)
 
     transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
@@ -149,19 +151,21 @@ if __name__ == '__main__':
         train_loader = torch.utils.data.DataLoader(
                         whole_dataset, 
                         batch_size=batchsize, sampler=train_subsampler)
+
         test_loader = torch.utils.data.DataLoader(
                         whole_dataset,
                         batch_size=batchsize, sampler=test_subsampler)
+
+        show_distribution_fold(train_loader, 'train', fold, PATH_PLOT)
+        show_distribution_fold(test_loader, 'test', fold, PATH_PLOT)
         
         model = load_densenet_mlp(path_model)
         model.to(device)
         #model.apply(reset_weights)
 
         best_model = None
-        best_test_loss = 1.
         best_test_acc = 0.
         best_pred_labels = []
-        best_prob_labels = []
         true_labels = []
         pred_labels = []
         test_acc = 0.
@@ -171,9 +175,9 @@ if __name__ == '__main__':
         weight_decay = 0.0001
         momentum = 0.8
         optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
-        scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
+        scheduler = StepLR(optimizer, step_size=18, gamma=0.1)
         
-        train_losses,test_losses  = [], []
+        train_losses, test_losses = [], []
 
         for epoch in range(1, epochs+1):
             print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
@@ -187,27 +191,27 @@ if __name__ == '__main__':
             train_losses.append(train_loss)
             test_losses.append(test_loss)
 
-            if best_model is None or (test_acc > best_test_acc):
+            if best_model is None or (test_acc >= best_test_acc):
                 best_model = copy.deepcopy(model)
-                best_test_loss = test_loss
                 best_test_acc = test_acc 
-                best_pred_labels = pred_labels
+                best_pred_labels = pred_labels 
+
+                print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f}')
+                print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
+                save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
 
         #torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray-seed-{seed}-fold-{fold}.pt')
-
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
         print('--------------------------------')
+
         results[fold] = 100.0 * best_test_acc
         save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
-        save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
-        
+
     # Print fold results
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
     print('--------------------------------')
     sum = 0.0
-
     for key, value in results.items():
         print(f'Fold {key}: {value} %')
         sum += value
-
     print(f'Average: {sum/len(results.items())} %')

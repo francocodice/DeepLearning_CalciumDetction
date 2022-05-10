@@ -1,3 +1,4 @@
+from unicodedata import name
 from pip import main
 import os
 from pydicom import dcmread
@@ -45,7 +46,7 @@ def fixLabels():
 
 def removeFiles():
         #path_dicom = "/home/fiodice/project/data_custom/"
-    path_dicom = "/home/fiodice/project/data/calcium/"
+    path_dicom = "/home/fiodice/project/data_only_new/"
 
     
     # Doppia radiografia frontale: 326 -> IM-0003-1003.dcm, IM-0002-1002.dcm 
@@ -68,33 +69,58 @@ def removeFiles():
 
     for path_file in DCM_files:
         ds = dcmread(path_file, force=True)
-
-        if(slope in ds and intercept in ds):
-            print(ds[slope].value, ds[intercept].value)
-       
-        size = os.path.getsize(path_file)
-        # ('0018','5101') -> View Position 
-
-        if ('0018','5101') in ds:
-            view_position = ds[('0018','5101')].value
-
-            if view_position == '':
-                count_empty += 1
-            elif view_position == 'PA' or view_position == 'AP' or view_position == 'NN':
-                count_front += 1
-            elif view_position == 'LL' or view_position == 'LAT' or view_position == 'LATERALE':
-                count_lat += 1
-                # os.remove(path) 
+        if 'PixelData' not in ds:
+                print('removed')
+                os.remove(path_file) 
         else:
 
-            if 'PixelData' in ds:
-                count_img_with_no_position += 1
+            #if(slope in ds and intercept in ds):
+            #    print(ds[slope].value, ds[intercept].value)
+        
+            size = os.path.getsize(path_file)
+            print(f'Path file {path_file} Size {size}')
+            # ('0018','5101') -> View Position 
+
+            if ('0018','5101') in ds:
+                view_position = ds[('0018','5101')].value
+
+                if view_position == '':
+                    count_empty += 1
+                elif view_position == 'PA' or view_position == 'AP' or view_position == 'NN':
+                    count_front += 1
+                elif view_position == 'LL' or view_position == 'LAT' or view_position == 'LATERALE':
+                    count_lat += 1
+                    os.remove(path_file) 
             else:
-                count_meta += 1
-                # os.remove(path) 
-            
 
-    tot = count_img_with_no_position + count_empty + count_front
-    print(f'Meta {count_meta} PA {count_front} LAT {count_lat} Empty {count_empty} Fault {count_img_with_no_position}')
-    print(f'File to check {tot}')
+                if 'PixelData' in ds:
+                    count_img_with_no_position += 1
+                else:
+                    count_meta += 1
+                    os.remove(path_file) 
+                
 
+        tot = count_img_with_no_position + count_empty + count_front
+        print(f'Meta {count_meta} PA {count_front} LAT {count_lat} Empty {count_empty} Fault {count_img_with_no_position}')
+        print(f'File to check {tot}')
+
+
+if __name__ == '__main__':
+    path_labels =  '/home/fiodice/project/labels/site.db'
+    conn = sqlite3.connect(path_labels)
+    conn.row_factory = sqlite3.Row  
+    cursor = conn.cursor()
+
+    cursor.execute(''' DELETE FROM patient WHERE id = 'CAC_083' ''')
+    cursor.execute(''' DELETE FROM patient WHERE id = 'CAC_096' ''')
+    #cursor.execute('''UPDATE patient SET id = 'CAC_187' WHERE id = 'CAC_083_corr' ''')
+
+
+    cursor.execute('''UPDATE patient SET id = 'CAC_083' WHERE id = 'CAC_083_corr' ''')
+    conn.commit()
+    cursor.execute('''UPDATE patient SET id = 'CAC_096' WHERE id = 'CAC_096_corr' ''')
+    conn.commit()
+
+    # Problema con 097: l'immagine ha id 098 e tale id non è presente nel site
+    cursor.execute('''UPDATE patient SET id = 'CAC_098' WHERE id = 'CAC_097' ''')
+    conn.commit()

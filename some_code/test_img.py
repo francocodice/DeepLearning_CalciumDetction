@@ -55,10 +55,11 @@ def folders_file():
 
 if __name__ == '__main__':
 
-    plot_dir = '/home/fiodice/project/plot_data/'
-    image_path = '/home/fiodice/project/dataset/CAC_495/rx/IM-0248-0004.dcm'
+    plot_dir = '/home/fiodice/project/plot_training/'
+    img_path = '/home/fiodice/project/dataset/CAC_187/rx/IM-0001-0001-0002.dcm'
 
-    list_img = folders_file()
+    #list_img = folders_file()
+    list_img = [img_path]
 
     for id, image_path in enumerate(list_img):
 
@@ -73,7 +74,9 @@ if __name__ == '__main__':
             
 
             # Normal mode:
-            print(ds[('0018','5101')].value)
+            #ds.PatientID = 'CAC_097'
+            #ds.PatientName = 'CAC_097'
+            #print(ds[('0018','5101')].value)
 
             print(f"SOP Class........: {ds.SOPClassUID} ({ds.SOPClassUID.name})")
             print()

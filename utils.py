@@ -134,6 +134,22 @@ def show_distribution(dataloader, set, path_plot):
     print(f'For {set} Labels {count_labels}')
 
 
+def show_distribution_fold(dataloader, set, fold, path_plot):
+    batch_labels = [label.tolist() for _, label in dataloader]
+    label_flat_list = [item for sublist in batch_labels for item in sublist]
+    count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
+    
+    val_samplesize = pd.DataFrame.from_dict(
+    {'[0:100]': [count_labels[0]], 
+     '> 100': count_labels[1],
+    })
+
+    sns.barplot(data=val_samplesize)
+    plt.savefig(path_plot + str(set) + '_fold' + str(fold) + '.png')
+    plt.close()
+    print(f'For {set} Labels {count_labels}')
+
+
 def show(imgs, name_file, path):
     if not isinstance(imgs, list):
         imgs = [imgs]

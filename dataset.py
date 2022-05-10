@@ -14,6 +14,36 @@ from skimage import exposure
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 
+
+def get_transforms(img_size, crop, mean, std):
+    train_transforms = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        #transforms.RandomRotation(degrees=15),
+        #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+    
+    return train_transforms, test_transform
+
+
+def get_patient_id(dimg):
+    if dimg.PatientID == 'CAC_097':
+        return 'CAC_097'
+    elif dimg.PatientID == 'CAC_1877':
+        return 'CAC_197'
+    else:
+        return dimg.PatientID
+
+
 class CalciumDetection(torch.utils.data.Dataset):
     def __init__(self, data_dir, labels_path, transform=None, require_path_file=False):
         self.root = data_dir
@@ -44,8 +74,10 @@ class CalciumDetection(torch.utils.data.Dataset):
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
 
-        # Manage label                
-        cac_score = [label for label in self.labels if label['id'] == dimg.PatientID][0]['cac_score']
+        # Manage label
+        print(f'Path {path} Pat_ID {dimg.PatientID}')
+                
+        cac_score = [label for label in self.labels if label['id'] == get_patient_id(dimg)][0]['cac_score']
         label = 0 if int(cac_score) in range(0, 101) else 1
 
         if self.transform is not None:
@@ -61,28 +93,21 @@ class CalciumDetection(torch.utils.data.Dataset):
 
 
 if __name__ == '__main__':
-    path_data = '/home/fiodice/project/dataset_split/train/'
-    path_data = '/home/fiodice/project/dataset_split/test/'
-
-    path_labels = '/home/fiodice/project/dataset/site.db'
+    path_data = '/home/fiodice/project/dataset/'
+    #path_labels = '/home/fiodice/project/dataset/site.db'
+    path_labels =  '/home/fiodice/project/labels/site.db'
 
     mean, std = [0.5024], [0.2898]
     train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
-    train = CalciumDetection(path_data, path_labels, transform=train_t)
-    test = CalciumDetection(path_data, path_labels, transform=test_t)
+    dataset = CalciumDetection(path_data, path_labels, transform=train_t)
 
-    train_loader = torch.utils.data.DataLoader(train,
+    data_loader = torch.utils.data.DataLoader(dataset,
                             batch_size = 1,
                             shuffle = False,
                             num_workers = 0)
 
-    test_loader = torch.utils.data.DataLoader(test,
-                            batch_size = 1,
-                            shuffle = False,
-                            num_workers = 0)
-
-    loaders = [train_loader, test_loader]
+    loaders = [data_loader]
     scores = []
 
     for loader in loaders:

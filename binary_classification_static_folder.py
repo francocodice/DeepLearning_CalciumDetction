@@ -101,9 +101,7 @@ def local_copy(dataset):
     data = []
     print('='*15, f'Copying dataset','='*15)
     for j in trange(len(dataset)):
-        label = dataset[j][1]
-        img = dataset[j][0]
-        data.append((img,label))
+        data.append((dataset[j][0],dataset[j][1]))
     return data
 
 
