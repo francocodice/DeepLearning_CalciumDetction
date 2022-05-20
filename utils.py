@@ -210,3 +210,19 @@ def save_roc_curve(true_labels, max_probs, path_plot):
     plt.legend(loc="lower right")
     plt.savefig(path_plot  + 'roc.png')
     plt.close()
+
+def save_roc_curve_fold(true_labels, max_probs, fold, path_plot):
+    fpr, tpr, _ = roc_curve(true_labels, max_probs, pos_label=1)
+    roc_auc = auc(fpr, tpr)
+    plt.figure(1)
+    lw = 2
+    plt.plot(fpr, tpr, color="darkorange", label='AUC = %0.2f' % roc_auc)
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve')
+    plt.legend(loc="lower right")
+    plt.savefig(path_plot  + 'fold_' + str(fold) + 'roc.png')
+    plt.close()

@@ -3,6 +3,7 @@ import dataset
 import copy
 import random
 import os
+import itertools
 
 from tqdm import tqdm
 from utils import *
@@ -108,10 +109,10 @@ def local_copy(dataset):
 if __name__ == '__main__':
     path_train_data = '/home/fiodice/project/dataset_split/train/'
     path_test_data = '/home/fiodice/project/dataset_split/test/'
-    path_labels = '/home/fiodice/project/dataset/site.db'
+    path_labels = '/home/fiodice/project/dataset/labels_new.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
-    seed = 64
+    seed = 128
     set_seed(seed)
 
     batchsize = 4
@@ -152,13 +153,21 @@ if __name__ == '__main__':
     #loss = F.binary_cross_entropy_with_logits(preds, targets, reduction='none')
     criterion = torch.nn.CrossEntropyLoss()
 
-    lr = 0.001
+    lr = 0.0001
     weight_decay = 0.0001
     momentum = 0.8
     epochs = 30
-    optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
-    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
+    #optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 
+    params = [model.fc.parameters()]
+    optimizer = torch.optim.AdamW(itertools.chain(*params),  
+                                    lr=lr,betas=(0.9, 0.999), 
+                                    eps=1e-08, 
+                                    weight_decay=weight_decay, 
+                                    amsgrad=False)
+     
+    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
+    scheduler = None
     print(f'Criterion {criterion}, lr {lr}, weight_decay {weight_decay}, momentum : {momentum}, batchsize : {batchsize} scheduler {scheduler}')
     
     train_losses,test_losses  = [], []
@@ -180,7 +189,7 @@ if __name__ == '__main__':
             best_pred_labels = pred_labels
             best_prob_labels = max_probs
 
-    torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray-seed-{seed}.pt')
+    torch.save({'model': best_model.state_dict()}, f'calcium-detection-adam-seed-{seed}.pt')
 
     #save_cm(true_labels, best_pred_labels, path_plot)
     print(f'Best model test accuracy: {best_test_acc:.4f}')
@@ -188,5 +197,5 @@ if __name__ == '__main__':
 
     save_losses(train_losses, test_losses, best_test_acc, PATH_PLOT)
     save_cm(true_labels, best_pred_labels, PATH_PLOT)
-    #save_roc_curve(true_labels, best_prob_labels, PATH_PLOT)
+    save_roc_curve(true_labels, best_prob_labels, PATH_PLOT)
     #show_wrong_classified(best_pred_labels, true_labels, test_set)

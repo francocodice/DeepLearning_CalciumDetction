@@ -36,10 +36,10 @@ def get_transforms(img_size, crop, mean, std):
 
 
 def get_patient_id(dimg):
-    if dimg.PatientID == 'CAC_097':
-        return 'CAC_097'
-    elif dimg.PatientID == 'CAC_1877':
-        return 'CAC_197'
+    #if dimg.PatientID == 'CAC_097':
+    #    return 'CAC_097'
+    if dimg.PatientID == 'CAC_1877':
+        return dimg.PatientName
     else:
         return dimg.PatientID
 
@@ -74,8 +74,7 @@ class CalciumDetection(torch.utils.data.Dataset):
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
 
-        # Manage label
-        print(f'Path {path} Pat_ID {dimg.PatientID}')
+        # Manage label print(f'Path {path} Pat_ID {dimg.PatientID} Pat_Name {dimg.PatientName}')
                 
         cac_score = [label for label in self.labels if label['id'] == get_patient_id(dimg)][0]['cac_score']
         label = 0 if int(cac_score) in range(0, 101) else 1
@@ -95,7 +94,7 @@ class CalciumDetection(torch.utils.data.Dataset):
 if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset/'
     #path_labels = '/home/fiodice/project/dataset/site.db'
-    path_labels =  '/home/fiodice/project/labels/site.db'
+    path_labels =  '/home/fiodice/project/labels/labels_new.db'
 
     mean, std = [0.5024], [0.2898]
     train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)

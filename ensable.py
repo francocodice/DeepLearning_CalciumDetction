@@ -5,7 +5,7 @@ import numpy as np
 from utils import *
 from model import *
 
-PATH_MODELS = '/home/fiodice/project/model_cacscore_seed/'
+PATH_MODELS = '/home/fiodice/project/cac_models_seed_adam/'
 #PATH_MODELS = '/home/fiodice/project/cac_models/calcium-detection-x-ray-77.pt'
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 

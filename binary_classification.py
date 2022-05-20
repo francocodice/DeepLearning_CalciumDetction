@@ -70,9 +70,9 @@ if __name__ == '__main__':
 
     train_set, test_set = split_train_val(size_train, cac_dataset)
 
-    mean, std = mean_std(train_set)
-    print(mean, std)
-    #mean, std = [0.5458], [0.2584]
+    # mean, std = mean_std(train_set)
+    # print(mean, std)
+    mean, std = [0.5445], [0.2591]
 
     train_set = normalize(train_set, mean, std)
     test_set = normalize(test_set, mean, std)

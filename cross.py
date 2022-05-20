@@ -1,15 +1,18 @@
 import torch
 import dataset
 import copy
+import itertools
 
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 from collections import Counter
 
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, MultiStepLR
 
 from utils import *
 from model import *
+
+# Path /home/fiodice/project/dataset/CAC_097/rx/IM-0001-0001.dcm Pat_ID CAC_098 Pat_Name CAC_098
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
@@ -23,6 +26,23 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(seed)
+
+
+def activate_denselayer16(model):
+    model_last_layer = model.encoder[-3][-2].denselayer16
+
+    for param in model_last_layer.parameters():
+        param.requires_grad = True
+
+    return model_last_layer
+
+def activate_denselayer15(model):
+    model_last_layer = model.encoder[-3][-2].denselayer15
+
+    for param in model_last_layer.parameters():
+        param.requires_grad = True
+
+    return model_last_layer
 
 
 def get_transforms(img_size, crop, mean, std):
@@ -75,21 +95,11 @@ def local_copy(dataset):
     return data
 
 
-def reset_weights(m):
-  '''
-    Try resetting model weights to avoid
-    weight leakage.
-  '''
-  for layer in m.children():
-   if hasattr(layer, 'reset_parameters'):
-    print(f'Reset trainable parameters of layer = {layer}')
-    layer.reset_parameters()
-
-
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc, samples_num = 0., 0., 0.
-    true_labels, pred_labels = [], []
-    
+    true_labels, pred_labels, outputs_labels = [], [], []
+    max_probs = None
+  
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
         
@@ -101,7 +111,8 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 
         true_labels.append(labels.detach().cpu())
         pred_labels.append(preds.detach().cpu())
-        
+        outputs_labels.append(outputs.detach().cpu())
+       
         if phase == 'train':
             loss.backward()
             optimizer.step()
@@ -113,17 +124,21 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     if scheduler is not None and phase == 'train':
         scheduler.step()
     
-    return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy()
+    if phase == 'test':
+        probs_outputs = torch.nn.functional.softmax(torch.cat(outputs_labels), dim=1)
+        max_probs , _ = torch.max(probs_outputs, 1)
+    
+    return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy(), max_probs
 
   
 if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset/'
-    path_labels = '/home/fiodice/project/dataset/site.db'
+    path_labels = '/home/fiodice/project/labels/labels_new.db'
     path_model = '/home/fiodice/project/model/final.pt'
 
     seed = 42
     k_folds = 5
-    epochs = 36
+    epochs = 100
     batchsize = 4
 
     results = {}
@@ -156,12 +171,13 @@ if __name__ == '__main__':
                         whole_dataset,
                         batch_size=batchsize, sampler=test_subsampler)
 
-        show_distribution_fold(train_loader, 'train', fold, PATH_PLOT)
-        show_distribution_fold(test_loader, 'test', fold, PATH_PLOT)
+        #show_distribution_fold(train_loader, 'train', fold, PATH_PLOT)
+        #show_distribution_fold(test_loader, 'test', fold, PATH_PLOT)
         
         model = load_densenet_mlp(path_model)
         model.to(device)
-        #model.apply(reset_weights)
+        model_denselayer16 = activate_denselayer16(model)
+        #model_denselayer15 = activate_denselayer15(model)
 
         best_model = None
         best_test_acc = 0.
@@ -173,17 +189,31 @@ if __name__ == '__main__':
         
         lr = 0.001
         weight_decay = 0.0001
-        momentum = 0.8
-        optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
-        scheduler = StepLR(optimizer, step_size=18, gamma=0.1)
+        momentum = 0.9
+        
+        params = [model.fc.parameters(), model_denselayer16.parameters()]
+        #optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
+        optimizer = torch.optim.SGD(itertools.chain(*params),  lr=lr, weight_decay=weight_decay, momentum=momentum)
+        
+        #optimizer = torch.optim.AdamW(itertools.chain(*params),  
+        #                            lr=lr,betas=(0.9, 0.999), 
+        #                            eps=1e-08, 
+        #                            weight_decay=weight_decay, 
+        #                            amsgrad=False)
+     
+        pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f'Pytorch trainable param {pytorch_total_params}')
+        #scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
+        scheduler = MultiStepLR(optimizer, milestones=[60,80], gamma=0.1)
+
         
         train_losses, test_losses = [], []
 
         for epoch in range(1, epochs+1):
             print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
 
-            train_loss, train_acc, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
-            test_loss, test_acc, true_labels, pred_labels = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
+            train_loss, train_acc, _, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
+            test_loss, test_acc, true_labels, pred_labels, max_probs = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
 
             print(f'\nTrain loss: {train_loss:.4f}, Train accuracy: {train_acc:.4f}')
             print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}\n')
@@ -199,8 +229,10 @@ if __name__ == '__main__':
                 print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f}')
                 print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
+                save_roc_curve_fold(true_labels, max_probs, fold, PATH_PLOT)
 
-        #torch.save({'model': best_model.state_dict()}, f'calcium-detection-x-ray-seed-{seed}-fold-{fold}.pt')
+
+        #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
         print('--------------------------------')
 
@@ -210,6 +242,7 @@ if __name__ == '__main__':
     # Print fold results
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
     print('--------------------------------')
+    
     sum = 0.0
     for key, value in results.items():
         print(f'Fold {key}: {value} %')

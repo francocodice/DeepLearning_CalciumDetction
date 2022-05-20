@@ -1,11 +1,18 @@
 from PIL import Image
 from glob import glob
 
-source_folder = '/home/fiodice/project/data_resize_2048/'
-target_folder = '/home/fiodice/project/data_resize_512/'
+results = {}
+results[0] = 100.0 * 0.7549
+results[1] = 100.0 * 0.7129
+results[2] = 100.0 * 0.7129
+results[3] = 100.0 * 0.6931
+results[4] = 100.0 * 0.7426
 
-for this_name in glob(source_folder+'*'):
-    print("Converting ", this_name)
-    im = Image.open(this_name)
-    im.thumbnail((512, 512), Image.ANTIALIAS)
-    im.save(target_folder+this_name.split('/')[-1], "PNG")
+
+print(f'K-FOLD CROSS VALIDATION RESULTS FOR {5} FOLDS')
+print('--------------------------------')
+sum = 0.0
+for key, value in results.items():
+    print(f'Fold {key}: {value:.3f} %')
+    sum += value
+print(f'Average: {sum/len(results.items())} %')
