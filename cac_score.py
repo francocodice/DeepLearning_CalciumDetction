@@ -1,73 +1,88 @@
 
+import dataset
 from matplotlib.pyplot import axes, ylabel
 import numpy as np
 from utils import *
 import torchvision.transforms as transforms
-import dataset
-from dataset import *
+
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 
-if __name__ == '__main__':
-    th_norm = (100 - 622.3462) / 820.8487
-    th = np.log(th_norm + 1)
-    print(f'TH norm log {th}')
-    th_log = np.log(100 + 1)
-    th = norm_log(th_log)
-    print(f'TH log norm {th}')
 
-    path_data = '/home/fiodice/project/dataset_split/train/'
-    path_data = '/home/fiodice/project/dataset_split/test/'
-    path_labels = '/home/fiodice/project/dataset/site.db'
+def class_score_binary(cac_score):
+    if int(cac_score) in range(0, 100):
+        return 0
+    else:
+        return 1
+
+
+if __name__ == '__main__':
+    #th_norm = (100 - 622.3462) / 820.8487
+    #th = np.log(th_norm + 1)
+    #print(f'TH norm log {th}')
+    #th_log = np.log(100 + 1)
+    #th = norm_log(th_log)
+    #print(f'TH log norm {th}')
+
+    path_data = '/home/fiodice/project/data_only_new/'
+    path_labels = '/home/fiodice/project/dataset/labels_new.db'
 
     train = dataset.CalciumDetectionRegression(path_data, path_labels, transform=None)
-    test = dataset.CalciumDetectionRegression(path_data, path_labels, transform=None)
+    #test = dataset.CalciumDetectionRegression(path_data, path_labels, transform=None)
 
     train_loader = torch.utils.data.DataLoader(train,
                             batch_size = 1,
                             shuffle = False,
                             num_workers = 0)
 
-    test_loader = torch.utils.data.DataLoader(test,
-                            batch_size = 1,
-                            shuffle = False,
-                            num_workers = 0)
+    # test_loader = torch.utils.data.DataLoader(test,
+    #                         batch_size = 1,
+    #                         shuffle = False,
+    #                         num_workers = 0)
 
-    loaders = [train_loader, test_loader]
+    loaders = [train_loader]
     scores = []
 
     for loader in loaders:
         for batch_idx, (data, labels) in enumerate(loader):
             scores.append(labels.numpy()[0])
 
-    score = np.clip(np.array(scores), 0, 2000)
+    # score = np.clip(np.array(scores), 0, 2000)
     #log_score = np.log(score + 1)
     #norm_score = (log_score - 3.8316) / 3.5604
-    norm_score = (score - score.mean())/score.std()
-    log_norm_score = np.log(norm_score + 1)
+    # norm_score = (score - score.mean())/score.std()
+    # log_norm_score = np.log(norm_score + 1)
 
-    norm_log_score = np.log(np.clip(np.array(scores), 0, 2000) + 1)
-    norm_log_score = (norm_log_score - norm_log_score.mean()) / norm_log_score.std()
+    # norm_log_score = np.log(np.clip(np.array(scores), 0, 2000) + 1)
+    # norm_log_score = (norm_log_score - norm_log_score.mean()) / norm_log_score.std()
 
-    print(f'Score : Min {score.min():.4f} Max {score.max():.4f} Mean {score.mean():.4f} Std {score.std():.4f}')
-    print(f'Log Norm Score : Min {log_norm_score.min():.4f} Max {log_norm_score.max():.4f} Mean {log_norm_score.mean():.4f} Std {log_norm_score.std():.4f}')
-    print(f'Norm Log Score : Min {norm_log_score.min():.4f} Max {norm_log_score.max():.4f} Mean {norm_log_score.mean():.4f} Std {norm_log_score.std():.4f}')
-
-    plt.figure()
-    plt.rcParams.update({'figure.figsize':(7,5), 'figure.dpi':100})
-    plt.hist(log_norm_score, bins=int(180/1))
-    plt.gca().set(title='Frequency Histogram of LogNorm CAC score', xlabel='calcium score', ylabel='Count')
-    plt.savefig(PATH_PLOT + 'cac_frequency_norm.png')
-    plt.close()
+    # print(f'Score : Min {score.min():.4f} Max {score.max():.4f} Mean {score.mean():.4f} Std {score.std():.4f}')
+    # print(f'Log Norm Score : Min {log_norm_score.min():.4f} Max {log_norm_score.max():.4f} Mean {log_norm_score.mean():.4f} Std {log_norm_score.std():.4f}')
+    # print(f'Norm Log Score : Min {norm_log_score.min():.4f} Max {norm_log_score.max():.4f} Mean {norm_log_score.mean():.4f} Std {norm_log_score.std():.4f}')
 
     plt.figure()
     plt.rcParams.update({'figure.figsize':(7,5), 'figure.dpi':100})
-    plt.hist(norm_log_score, bins=int(180/1))
-    plt.gca().set(title='Frequency Histogram of NormLog CAC score', xlabel='calcium score', ylabel='Count')
-    plt.savefig(PATH_PLOT + 'cac_frequency_log.png')
+    plt.hist(scores, bins=int(180/1))
+    plt.gca().set(title='Frequency Histogram of STD CAC score', xlabel='Calcium score', ylabel='Count')
+    plt.savefig(PATH_PLOT + 'cac_frequency.png')
     plt.close()
 
+    labels = []
+    for s in scores:
+        class_ref = class_score_binary(int(s))
+        labels.append(class_ref)
+
+    #labels = [class_score_binary(int(row['cac_score'])) for row in scores]
+    count_labels = collections.OrderedDict(sorted(collections.Counter(labels).items()))
+
+    val_samplesize = pd.DataFrame.from_dict(
+        {'[0:100]': [count_labels[0]], 
+          '[>100]': count_labels[1],
+        })
+
+    sns.barplot(data=val_samplesize).set_title('Labels distribution', fontsize=15)
+    plt.savefig(PATH_PLOT + 'analisi.png')
 
     #plt.figure()
     #plt.rcParams.update({'figure.figsize':(7,5), 'figure.dpi':100})

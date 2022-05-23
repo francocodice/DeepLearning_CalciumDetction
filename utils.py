@@ -211,8 +211,8 @@ def save_roc_curve(true_labels, max_probs, path_plot):
     plt.savefig(path_plot  + 'roc.png')
     plt.close()
 
-def save_roc_curve_fold(true_labels, max_probs, fold, path_plot):
-    fpr, tpr, _ = roc_curve(true_labels, max_probs, pos_label=1)
+def save_roc_curve_fold(true_labels, probs, fold, path_plot):
+    fpr, tpr, _ = roc_curve(true_labels, probs, pos_label=1)
     roc_auc = auc(fpr, tpr)
     plt.figure(1)
     lw = 2

@@ -88,8 +88,8 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
         cac_score = [label for label in self.labels if label['id'] == dimg.PatientID][0]['cac_score']
         #cac_norm = to_norm(np.clip([cac_score],a_min=0, a_max=2000))
         #label = np.log(cac_norm + 1)[0] 
-        cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 1))
-        label = norm_log(cac_log)[0]
+        #cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 1))
+        #label = norm_log(cac_log)[0]
 
         if self.transform is not None:
             img = self.transform(img=img)

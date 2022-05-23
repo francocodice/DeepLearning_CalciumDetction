@@ -4,7 +4,7 @@ import copy
 import itertools
 
 from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_curve, balanced_accuracy_score
 from collections import Counter
 
 from torch.optim.lr_scheduler import StepLR, MultiStepLR
@@ -125,10 +125,9 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
         scheduler.step()
     
     if phase == 'test':
-        probs_outputs = torch.nn.functional.softmax(torch.cat(outputs_labels), dim=1)
-        max_probs , _ = torch.max(probs_outputs, 1)
+        probabilities = torch.nn.functional.softmax(torch.cat(outputs_labels), dim=1)[:, 1]
     
-    return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy(), max_probs
+    return epoch_loss / len(dataloader), epoch_acc / samples_num, torch.cat(true_labels).numpy(), torch.cat(pred_labels).numpy(), probabilities
 
   
 if __name__ == '__main__':
@@ -138,7 +137,7 @@ if __name__ == '__main__':
 
     seed = 42
     k_folds = 5
-    epochs = 100
+    epochs = 80
     batchsize = 4
 
     results = {}
@@ -204,8 +203,7 @@ if __name__ == '__main__':
         pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f'Pytorch trainable param {pytorch_total_params}')
         #scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
-        scheduler = MultiStepLR(optimizer, milestones=[60,80], gamma=0.1)
-
+        scheduler = MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
         
         train_losses, test_losses = [], []
 
@@ -213,26 +211,28 @@ if __name__ == '__main__':
             print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
 
             train_loss, train_acc, _, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
-            test_loss, test_acc, true_labels, pred_labels, max_probs = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
+            test_loss, test_acc, true_labels, pred_labels, probs = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
 
             print(f'\nTrain loss: {train_loss:.4f}, Train accuracy: {train_acc:.4f}')
             print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}\n')
 
             train_losses.append(train_loss)
             test_losses.append(test_loss)
+            y_score = probs.detach().numpy()
+            #nn_fpr, nn_tpr, nn_thresholds = roc_curve(true_labels, y_score)
+
 
             if best_model is None or (test_acc >= best_test_acc):
                 best_model = copy.deepcopy(model)
                 best_test_acc = test_acc 
                 best_pred_labels = pred_labels 
 
-                print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f}')
+                print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f} B-Acc {balanced_accuracy_score(true_labels, pred_labels)}')
                 print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
-                save_roc_curve_fold(true_labels, max_probs, fold, PATH_PLOT)
+                save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
 
-
-        #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
+        torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
         print('--------------------------------')
 
