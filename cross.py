@@ -4,10 +4,10 @@ import copy
 import itertools
 
 from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score, roc_curve, balanced_accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from collections import Counter
 
-from torch.optim.lr_scheduler import StepLR, MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR
 
 from utils import *
 from model import *
@@ -30,14 +30,6 @@ def set_seed(seed):
 
 def activate_denselayer16(model):
     model_last_layer = model.encoder[-3][-2].denselayer16
-
-    for param in model_last_layer.parameters():
-        param.requires_grad = True
-
-    return model_last_layer
-
-def activate_denselayer15(model):
-    model_last_layer = model.encoder[-3][-2].denselayer15
 
     for param in model_last_layer.parameters():
         param.requires_grad = True
@@ -98,7 +90,7 @@ def local_copy(dataset):
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc, samples_num = 0., 0., 0.
     true_labels, pred_labels, outputs_labels = [], [], []
-    max_probs = None
+    probabilities = None
   
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
@@ -137,13 +129,13 @@ if __name__ == '__main__':
 
     seed = 42
     k_folds = 5
-    epochs = 80
+    epochs = 60
     batchsize = 4
 
-    results = {}
-    mean, std = [0.5024], [0.2898]
-
     set_seed(seed)
+
+    accs, b_accs = {}, {}
+    mean, std = [0.5024], [0.2898]
 
     transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
@@ -152,12 +144,12 @@ if __name__ == '__main__':
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
 
-    print('--------------------------------')
+    print('='*30)
     criterion = torch.nn.CrossEntropyLoss()
 
     for fold, (train_ids, test_ids) in enumerate(kfold.split(whole_dataset)):
         print(f'FOLD {fold}')
-        print('--------------------------------')
+        print('='*30)
     
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
@@ -176,10 +168,9 @@ if __name__ == '__main__':
         model = load_densenet_mlp(path_model)
         model.to(device)
         model_denselayer16 = activate_denselayer16(model)
-        #model_denselayer15 = activate_denselayer15(model)
 
         best_model = None
-        best_test_acc = 0.
+        best_test_acc, best_test_bacc = 0., 0.
         best_pred_labels = []
         true_labels = []
         pred_labels = []
@@ -191,7 +182,6 @@ if __name__ == '__main__':
         momentum = 0.9
         
         params = [model.fc.parameters(), model_denselayer16.parameters()]
-        #optimizer = torch.optim.SGD(model.fc.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
         optimizer = torch.optim.SGD(itertools.chain(*params),  lr=lr, weight_decay=weight_decay, momentum=momentum)
         
         #optimizer = torch.optim.AdamW(itertools.chain(*params),  
@@ -200,10 +190,10 @@ if __name__ == '__main__':
         #                            weight_decay=weight_decay, 
         #                            amsgrad=False)
      
-        pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f'Pytorch trainable param {pytorch_total_params}')
+        print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
+        
         #scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
-        scheduler = MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
+        scheduler = MultiStepLR(optimizer, milestones=[25,50], gamma=0.1)
         
         train_losses, test_losses = [], []
 
@@ -219,24 +209,26 @@ if __name__ == '__main__':
             train_losses.append(train_loss)
             test_losses.append(test_loss)
             y_score = probs.detach().numpy()
-            #nn_fpr, nn_tpr, nn_thresholds = roc_curve(true_labels, y_score)
 
-
-            if best_model is None or (test_acc >= best_test_acc):
+            if best_model is None or (test_acc > best_test_acc):
                 best_model = copy.deepcopy(model)
+                best_test_bacc = balanced_accuracy_score(true_labels, pred_labels)
                 best_test_acc = test_acc 
                 best_pred_labels = pred_labels 
 
-                print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f} B-Acc {balanced_accuracy_score(true_labels, pred_labels)}')
+                print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f} B-Acc : {balanced_accuracy_score(true_labels, pred_labels):.4f}')
                 print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
                 save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
 
         torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
-        print('--------------------------------')
+        print('B-Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_bacc))
 
-        results[fold] = 100.0 * best_test_acc
+        print('--------------------------------')
+        
+        b_accs[fold] = 100.0 * best_test_bacc
+        accs[fold] = 100.0 * best_test_acc
         save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
 
     # Print fold results
@@ -244,7 +236,16 @@ if __name__ == '__main__':
     print('--------------------------------')
     
     sum = 0.0
-    for key, value in results.items():
+    for key, value in accs.items():
         print(f'Fold {key}: {value} %')
         sum += value
-    print(f'Average: {sum/len(results.items())} %')
+
+    print(f'ACC Average: {sum/len(accs.items())} %')
+    print()
+
+    sum = 0.0
+    for key, value in b_accs.items():
+        print(f'Fold {key}: {value} %')
+        sum += value
+
+    print(f'B-ACC Average: {sum/len(accs.items())} %')

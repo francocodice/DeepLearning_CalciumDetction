@@ -11,7 +11,7 @@ PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 
 def class_score_binary(cac_score):
-    if int(cac_score) in range(0, 100):
+    if int(cac_score) in range(0, 11):
         return 0
     else:
         return 1
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     #th = norm_log(th_log)
     #print(f'TH log norm {th}')
 
-    path_data = '/home/fiodice/project/data_only_new/'
+    path_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/dataset/labels_new.db'
 
     train = dataset.CalciumDetectionRegression(path_data, path_labels, transform=None)
@@ -77,12 +77,12 @@ if __name__ == '__main__':
     count_labels = collections.OrderedDict(sorted(collections.Counter(labels).items()))
 
     val_samplesize = pd.DataFrame.from_dict(
-        {'[0:100]': [count_labels[0]], 
-          '[>100]': count_labels[1],
+        {'[0:10]': [count_labels[0]], 
+          '[>10]': count_labels[1],
         })
 
     sns.barplot(data=val_samplesize).set_title('Labels distribution', fontsize=15)
-    plt.savefig(PATH_PLOT + 'analisi.png')
+    plt.savefig(PATH_PLOT + 'analisi2.png')
 
     #plt.figure()
     #plt.rcParams.update({'figure.figsize':(7,5), 'figure.dpi':100})
