@@ -40,7 +40,7 @@ def activate_denselayer16(model):
 def get_transforms(img_size, crop, mean, std):
     train_transforms = transforms.Compose([
         transforms.Resize((img_size, img_size)),
-        #transforms.RandomRotation(degrees=15),
+        transforms.RandomRotation(degrees=5),
         #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
         transforms.CenterCrop(crop),
         transforms.ToTensor(),
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
     seed = 42
     k_folds = 5
-    epochs = 60
+    epochs = 80
     batchsize = 4
 
     set_seed(seed)
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
         
         #scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
-        scheduler = MultiStepLR(optimizer, milestones=[25,50], gamma=0.1)
+        scheduler = MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
         
         train_losses, test_losses = [], []
 
@@ -221,7 +221,7 @@ if __name__ == '__main__':
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
                 save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
 
-        torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
+        #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
         print('B-Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_bacc))
 

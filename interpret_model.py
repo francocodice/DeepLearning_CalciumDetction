@@ -48,7 +48,7 @@ def get_transforms(img_size, crop, mean, std):
 
 
 if __name__ == '__main__':
-    path_model = '/home/fiodice/project/cac_models/best/calcium-detection-sdg-seed-42-fold-2.pt'
+    path_model = '/home/fiodice/project/src/best/calcium-detection-sdg-seed-42-fold-2.pt'
     path_img = '/home/fiodice/project/dataset_split/test/CAC_001.1/rx/IM-0001-0001-0001.dcm'
 
     cd_model = model.test_calcium_det(path_model)
@@ -79,17 +79,10 @@ if __name__ == '__main__':
     input_img = np.transpose(input.squeeze(0).cpu().detach().numpy(), (1,2,0))
 
 
-    f, a = viz.visualize_image_attr(input_attr,
+    _ = viz.visualize_image_attr(input_attr,
                                 input_img,
                                 method='heat_map',
                                 cmap=default_cmap,
                                 show_colorbar=True,
                                 sign='positive',
-                                use_pyplot=False,
                                 outlier_perc=1)
-
-    plt.figure(figsize=(16, 8))
-    plt.plot(f)
-    plt.legend()
-    plt.savefig(PATH_PLOT  + 'test.png')
-    plt.close()

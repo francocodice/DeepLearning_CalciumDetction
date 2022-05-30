@@ -23,6 +23,26 @@ from skimage import exposure
 IDX_IMG = 0
 IDX_LABEL = 1
 
+
+def set_seed(seed):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(seed)
+
+
+def activate_denselayer16(model):
+    model_last_layer = model.encoder[-3][-2].denselayer16
+
+    for param in model_last_layer.parameters():
+        param.requires_grad = True
+
+    return model_last_layer
+
+
 ## dataset utils
 
 def mean_std(dataset):
@@ -134,22 +154,6 @@ def show_distribution(dataloader, set, path_plot):
     print(f'For {set} Labels {count_labels}')
 
 
-def show_distribution_fold(dataloader, set, fold, path_plot):
-    batch_labels = [label.tolist() for _, label in dataloader]
-    label_flat_list = [item for sublist in batch_labels for item in sublist]
-    count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
-    
-    val_samplesize = pd.DataFrame.from_dict(
-    {'[0:100]': [count_labels[0]], 
-     '> 100': count_labels[1],
-    })
-
-    sns.barplot(data=val_samplesize)
-    plt.savefig(path_plot + str(set) + '_fold' + str(fold) + '.png')
-    plt.close()
-    print(f'For {set} Labels {count_labels}')
-
-
 def show(imgs, name_file, path):
     if not isinstance(imgs, list):
         imgs = [imgs]
@@ -211,6 +215,27 @@ def save_roc_curve(true_labels, max_probs, path_plot):
     plt.savefig(path_plot  + 'roc.png')
     plt.close()
 
+## cross validation utils
+
+def save_losses_fold(train_losses, test_losses, best_test_acc, fold, path_plot):
+    plt.figure(figsize=(16, 8))
+    plt.title(f'Best accuracy : {best_test_acc:.4f}')
+    plt.plot(train_losses, label='Train loss')
+    plt.plot(test_losses, label='Test loss')
+    plt.legend()
+    plt.savefig(path_plot  + 'losses_fold' + str(fold) + '.png')
+    plt.close()
+
+
+def save_cm_fold(true_labels, best_pred_labels, fold, path_plot):
+    cm = confusion_matrix(true_labels, best_pred_labels)
+    ax = sns.heatmap(cm, annot=True, fmt="d")
+    hm = ax.get_figure()
+    hm.savefig(path_plot + 'cm_fold' + str(fold) + '.png')
+    hm.clf()
+    plt.close(hm)
+
+
 def save_roc_curve_fold(true_labels, probs, fold, path_plot):
     fpr, tpr, _ = roc_curve(true_labels, probs, pos_label=1)
     roc_auc = auc(fpr, tpr)
@@ -226,3 +251,20 @@ def save_roc_curve_fold(true_labels, probs, fold, path_plot):
     plt.legend(loc="lower right")
     plt.savefig(path_plot  + 'fold_' + str(fold) + 'roc.png')
     plt.close()
+
+
+
+def show_distribution_fold(dataloader, set, fold, path_plot):
+    batch_labels = [label.tolist() for _, label in dataloader]
+    label_flat_list = [item for sublist in batch_labels for item in sublist]
+    count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
+    
+    val_samplesize = pd.DataFrame.from_dict(
+    {'[0:100]': [count_labels[0]], 
+     '> 100': count_labels[1],
+    })
+
+    sns.barplot(data=val_samplesize)
+    plt.savefig(path_plot + str(set) + '_fold' + str(fold) + '.png')
+    plt.close()
+    print(f'For {set} Labels {count_labels}')

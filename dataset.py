@@ -14,6 +14,9 @@ from skimage import exposure
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 
+def norm():
+    pass
+
 
 def get_transforms(img_size, crop, mean, std):
     train_transforms = transforms.Compose([
@@ -105,6 +108,7 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
         return len(self.elem)
 
     def __getitem__(self, idx):
+        # Process img                
         path = self.elem[idx] + os.listdir(self.elem[idx])[0]
         dimg = pydicom.dcmread(path, force=True)
         img16 = apply_windowing(dimg.pixel_array, dimg)
@@ -113,19 +117,19 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
 
-        # Manage label                
+        # Process label                
         cac_score = [label for label in self.labels if label['id'] == get_patient_id(dimg)][0]['cac_score']
-        cac_norm = np.clip([cac_score],a_min=0, a_max=2000)
-        label = np.log(cac_norm + 1)[0] 
+        cac_clip = np.clip([cac_score],a_min=0, a_max=2000)
+        log_cac_score = np.log(cac_clip + 1)[0] 
         #cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 1))
-        #label = norm_log(cac_log)[0]
+        #cac_norm = norm_log(cac_log)[0]
 
         if self.transform is not None:
             img = self.transform(img=img)
         else:
             img = torchvision.transforms.ToTensor()(img)
 
-        return img.float(), cac_score 
+        return img.float(), log_cac_score 
 
 
 

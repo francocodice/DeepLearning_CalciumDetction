@@ -19,30 +19,19 @@ THRESHOLD_CAC_SCORE = 0.2895
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def set_seed(seed):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.manual_seed(seed)
+
+def mean_std_cac_score(loader):
+    train_log_score = torch.cat([labels for (_, labels) in loader]).numpy()
+    return train_log_score.mean(), train_log_score.std()
 
 
-def activate_denselayer16(model):
-    model_last_layer = model.encoder[-3][-2].denselayer16
-
-    for param in model_last_layer.parameters():
-        param.requires_grad = True
-
-    return model_last_layer
+def norm_labels(mean, std, labels):
+    return labels - mean / std
 
 
 def get_transforms(img_size, crop, mean, std):
     train_transforms = transforms.Compose([
         transforms.Resize((img_size, img_size)),
-        #transforms.RandomRotation(degrees=15),
-        #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
         transforms.CenterCrop(crop),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
@@ -56,26 +45,6 @@ def get_transforms(img_size, crop, mean, std):
     ])
     
     return train_transforms, test_transform
-
-
-
-def save_losses_fold(train_losses, test_losses, best_test_acc, fold, path_plot):
-    plt.figure(figsize=(16, 8))
-    plt.title(f'Best accuracy : {best_test_acc:.4f}')
-    plt.plot(train_losses, label='Train loss')
-    plt.plot(test_losses, label='Test loss')
-    plt.legend()
-    plt.savefig(path_plot  + 'losses_fold' + str(fold) + '.png')
-    plt.close()
-
-
-def save_cm_fold(true_labels, best_pred_labels, fold, path_plot):
-    cm = confusion_matrix(true_labels, best_pred_labels)
-    ax = sns.heatmap(cm, annot=True, fmt="d")
-    hm = ax.get_figure()
-    hm.savefig(path_plot + 'cm_fold' + str(fold) + '.png')
-    hm.clf()
-    plt.close(hm)
 
 
 def local_copy(dataset):
@@ -92,35 +61,26 @@ def mean_absolute_error(y_true, y_pred):
     return np.sum(np.abs(np.array(y_pred) - np.array(y_true)))
 
 
-def to_class(continuos_values, labels):
-    classes_labels = [0 if labels[i] <= THRESHOLD_CAC_SCORE else 1 for i in range(labels.size(dim=0))]
-    output_labels = [0 if continuos_values[i] <= THRESHOLD_CAC_SCORE else 1 for i in range(continuos_values.size(dim=0))]
+def to_class(continuos_values, labels, th):
+    classes_labels = [0 if labels[i] <= th else 1 for i in range(labels.size(dim=0))]
+    output_labels = [0 if continuos_values[i] <= th else 1 for i in range(continuos_values.size(dim=0))]
     return torch.tensor(output_labels), torch.tensor(classes_labels)
 
 
-def show_wrong_classified(best_pred_labels, true_labels, test_set):
-    res = best_pred_labels == true_labels
-    for id, (data, label) in enumerate(test_set):
-        if res[id] == False:
-            plt.figure()
-            plt.title(f'Wrong classification, correct is {label}')
-            plt.imshow((data.cpu().permute(1, 2, 0).numpy() + mean) * std,cmap=plt.cm.gray)        
-            plt.savefig(PATH_PLOT + 'error_'  + str(id) + '.png')
-            plt.close()
-
-
-def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
+def run(model, dataloader, criterion, optimizer, mean, std, scheduler=None, phase='train'):
     epoch_loss, epoch_acc, samples_num = 0., 0., 0.
     true_labels, pred_labels = [], []
     run_abs = 0.,
     
     for (data, labels) in tqdm(dataloader):
         data, labels = data.to(device), labels.to(device)
+        labels = norm_labels(mean, std, labels)
         
         optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
             outputs = model(data)
-            output_classes, labels_classes = to_class(outputs.detach().cpu(), labels.detach().cpu())
+            th = (np.log(101) - mean) / std
+            output_classes, labels_classes = to_class(outputs.detach().cpu(), labels.detach().cpu(), th)
             loss = criterion(outputs.float(), labels.unsqueeze(dim=1).float()).to(device)
 
         true_labels.append(labels_classes)
@@ -158,7 +118,7 @@ if __name__ == '__main__':
 
     transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
-    whole_dataset = dataset.CalciumDetectionRegresèposion(path_data, path_labels, transform)
+    whole_dataset = dataset.CalciumDetectionRegression(path_data, path_labels, transform)
     whole_dataset = local_copy(whole_dataset)
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
@@ -176,6 +136,9 @@ if __name__ == '__main__':
         train_loader = torch.utils.data.DataLoader(
                         whole_dataset, 
                         batch_size=batchsize, sampler=train_subsampler)
+
+        mean_cac, std_cac = mean_std_cac_score(train_loader)
+        #print(mean_cac, std_cac)
 
         test_loader = torch.utils.data.DataLoader(
                         whole_dataset,
@@ -202,32 +165,23 @@ if __name__ == '__main__':
         
         params = [model.fc.parameters(), model_denselayer16.parameters()]
         optimizer = torch.optim.SGD(itertools.chain(*params),  lr=lr, weight_decay=weight_decay, momentum=momentum)
-        
-        #optimizer = torch.optim.AdamW(itertools.chain(*params),  
-        #                            lr=lr,betas=(0.9, 0.999), 
-        #                            eps=1e-08, 
-        #                            weight_decay=weight_decay, 
-        #                            amsgrad=False)
-     
-        print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
-        
-        #scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
-        scheduler = MultiStepLR(optimizer, milestones=[25,50], gamma=0.1)
+        scheduler = MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
         
         train_losses, test_losses = [], []
+
+        print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
 
         for epoch in range(1, epochs+1):
             print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
 
-            train_loss, train_acc, _, _, _ = run(model, train_loader, criterion, optimizer, scheduler=scheduler)
-            test_loss, test_acc, true_labels, pred_labels, probs = run(model, test_loader, criterion, optimizer,scheduler=scheduler, phase='test')
+            train_loss, train_acc, _, _, _ = run(model, train_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler)
+            test_loss, test_acc, true_labels, pred_labels, _ = run(model, test_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler, phase='test',)
 
             print(f'\nTrain loss: {train_loss:.4f}, Train accuracy: {train_acc:.4f}')
             print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}\n')
 
             train_losses.append(train_loss)
             test_losses.append(test_loss)
-            y_score = probs.detach().numpy()
 
             if best_model is None or (test_acc > best_test_acc):
                 best_model = copy.deepcopy(model)
@@ -238,7 +192,7 @@ if __name__ == '__main__':
                 print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f} B-Acc : {balanced_accuracy_score(true_labels, pred_labels):.4f}')
                 print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
-                save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
+                #save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
 
         torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))

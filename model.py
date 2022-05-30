@@ -244,31 +244,9 @@ def load_densenet_mlp(path_model):
 
     model.fc =  torch.nn.Sequential(
             torch.nn.Linear(1024, 64),
+            torch.nn.Dropout(p=0.4),
             torch.nn.ReLU(),
             torch.nn.Linear(64, 2))
-
-    for param in model.fc.parameters():
-        param.requires_grad = True
-    
-    return model
-
-
-def load_densenet_BCE(path_model):
-    model = HierarchicalResidual(encoder='densenet121')
-    dict_model = torch.load(path_model)["model"]
-    model.load_state_dict(dict_model)
-
-    del model.fc1
-    del model.fc2
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(1024, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 1),
-            torch.nn.Sigmoid())
 
     for param in model.fc.parameters():
         param.requires_grad = True
