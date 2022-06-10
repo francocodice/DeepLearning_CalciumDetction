@@ -2,6 +2,8 @@ import torch
 from PIL import Image
 import glob
 import os
+import gc
+
 import torchvision
 import pydicom
 import numpy as np
@@ -72,8 +74,6 @@ class CalciumDetection(torch.utils.data.Dataset):
         img8 = convert(img_eq, 0, 255, np.uint8)
         img_array = ~img8 if dimg.PhotometricInterpretation == 'MONOCHROME1' else img8
         img = Image.fromarray(img_array)
-
-        # Manage label print(f'Path {path} Pat_ID {dimg.PatientID} Pat_Name {dimg.PatientName}')
         
         cac_score = [label for label in self.labels if label['id'] == get_patient_id(dimg)][0]['cac_score']
         label = 0 if int(cac_score) in range(0, 11) else 1
@@ -134,6 +134,11 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
 
 
 if __name__ == '__main__':
+
+    gc.collect()
+
+    torch.cuda.empty_cache()
+
     path_data = '/home/fiodice/project/dataset/'
     #path_labels = '/home/fiodice/project/dataset/site.db'
     path_labels =  '/home/fiodice/project/labels/labels_new.db'

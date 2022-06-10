@@ -9,7 +9,6 @@ import torchvision.transforms as transforms
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 
-
 def class_score_binary(cac_score):
     if int(cac_score) in range(0, 11):
         return 0

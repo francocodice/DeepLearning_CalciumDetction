@@ -18,35 +18,6 @@ PATH_PLOT = '/home/fiodice/project/plot_training/'
 mean, std = [0.5024], [0.2898]
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def set_seed(seed):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.manual_seed(seed)
-
-
-def get_transforms(img_size, crop, mean, std):
-    train_transforms = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        #transforms.RandomRotation(degrees=15),
-        #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-
-    test_transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-    
-    return train_transforms, test_transform
-
 
 def show_wrong_classified(best_pred_labels, true_labels, test_set):
     res = best_pred_labels == true_labels

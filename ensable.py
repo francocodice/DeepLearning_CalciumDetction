@@ -4,9 +4,9 @@ import numpy as np
 
 from utils import *
 from model import *
+from utils_model import *
 
 PATH_MODELS = '/home/fiodice/project/cac_models/test/'
-#PATH_MODELS = '/home/fiodice/project/cac_models/calcium-detection-x-ray-77.pt'
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -18,28 +18,6 @@ def ensable_choise(outputs):
         output_i = [out[i].item() for out in outputs]
         res[i] = np.bincount(output_i).argmax()
     return res
-
-
-def get_transforms(img_size, crop, mean, std):
-    train_transforms = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        #transforms.RandomRotation(degrees=15),
-        #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-
-    test_transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-    
-    return train_transforms, test_transform
-
-    ## FIX IMAGE CAC_187 errore nell'id (remove temp)
 
 
 if __name__ == '__main__':

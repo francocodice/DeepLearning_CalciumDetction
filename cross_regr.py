@@ -11,14 +11,13 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 from utils import *
 from model import *
+from tqdm import tqdm
 
-# Path /home/fiodice/project/dataset/CAC_097/rx/IM-0001-0001.dcm Pat_ID CAC_098 Pat_Name CAC_098
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
-THRESHOLD_CAC_SCORE = 0.2895
+THRESHOLD_CAC_SCORE = 10
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 def mean_std_cac_score(loader):
     train_log_score = torch.cat([labels for (_, labels) in loader]).numpy()
@@ -26,7 +25,7 @@ def mean_std_cac_score(loader):
 
 
 def norm_labels(mean, std, labels):
-    return labels - mean / std
+    return (labels - mean) / std
 
 
 def get_transforms(img_size, crop, mean, std):
@@ -46,15 +45,9 @@ def get_transforms(img_size, crop, mean, std):
     
     return train_transforms, test_transform
 
-
+# Icrease speed of training a lots
 def local_copy(dataset):
-    data = []
-    print('='*15, f'Copying dataset','='*15)
-    for j in trange(len(dataset)):
-        label = dataset[j][1]
-        img = dataset[j][0]
-        data.append((img,label))
-    return data
+    return [(dataset[j][0],dataset[j][1]) for j in range(len(dataset))]
 
 
 def mean_absolute_error(y_true, y_pred):
@@ -79,7 +72,7 @@ def run(model, dataloader, criterion, optimizer, mean, std, scheduler=None, phas
         optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
             outputs = model(data)
-            th = (np.log(101) - mean) / std
+            th = (np.log(THRESHOLD_CAC_SCORE + 0.001) - mean) / std
             output_classes, labels_classes = to_class(outputs.detach().cpu(), labels.detach().cpu(), th)
             loss = criterion(outputs.float(), labels.unsqueeze(dim=1).float()).to(device)
 
@@ -108,7 +101,7 @@ if __name__ == '__main__':
 
     seed = 42
     k_folds = 5
-    epochs = 60
+    epochs = 80
     batchsize = 4
 
     set_seed(seed)
@@ -138,7 +131,6 @@ if __name__ == '__main__':
                         batch_size=batchsize, sampler=train_subsampler)
 
         mean_cac, std_cac = mean_std_cac_score(train_loader)
-        #print(mean_cac, std_cac)
 
         test_loader = torch.utils.data.DataLoader(
                         whole_dataset,
@@ -168,20 +160,25 @@ if __name__ == '__main__':
         scheduler = MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
         
         train_losses, test_losses = [], []
-
+        train_accs, test_accs = [],[]
+        trains_abs, tests_abs = [], []
         print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
 
         for epoch in range(1, epochs+1):
             print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
 
-            train_loss, train_acc, _, _, _ = run(model, train_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler)
-            test_loss, test_acc, true_labels, pred_labels, _ = run(model, test_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler, phase='test',)
+            train_loss, train_acc, _, _, train_abs = run(model, train_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler)
+            test_loss, test_acc, true_labels, pred_labels, test_abs = run(model, test_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler, phase='test')
 
             print(f'\nTrain loss: {train_loss:.4f}, Train accuracy: {train_acc:.4f}')
             print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}\n')
 
             train_losses.append(train_loss)
             test_losses.append(test_loss)
+            train_accs.append(train_acc)
+            test_accs.append(test_acc)
+            trains_abs.append(train_abs)
+            tests_abs.append(test_abs)
 
             if best_model is None or (test_acc > best_test_acc):
                 best_model = copy.deepcopy(model)
@@ -194,7 +191,9 @@ if __name__ == '__main__':
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
                 #save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
 
-        torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
+        #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
+        save_metric_fold(train_accs, test_accs, 'accs', fold, PATH_PLOT)
+        save_metric_fold(trains_abs, tests_abs, 'abs', fold, PATH_PLOT)
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
         print('B-Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_bacc))
 
@@ -212,7 +211,6 @@ if __name__ == '__main__':
     for key, value in accs.items():
         print(f'Fold {key}: {value} %')
         sum += value
-
     print(f'ACC Average: {sum/len(accs.items())} %')
     print()
 
@@ -220,5 +218,4 @@ if __name__ == '__main__':
     for key, value in b_accs.items():
         print(f'Fold {key}: {value} %')
         sum += value
-
     print(f'B-ACC Average: {sum/len(accs.items())} %')

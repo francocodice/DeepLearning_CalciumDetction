@@ -12,16 +12,11 @@ import torchvision.transforms as transforms
 import seaborn as sns
 import pandas as pd 
 
-from tqdm import tqdm, trange
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_curve, auc
 from pydicom.pixel_data_handlers.util import  apply_windowing
 from PIL import Image
 from skimage import exposure
-
-
-IDX_IMG = 0
-IDX_LABEL = 1
 
 
 def set_seed(seed):
@@ -34,55 +29,22 @@ def set_seed(seed):
     torch.manual_seed(seed)
 
 
-def activate_denselayer16(model):
-    model_last_layer = model.encoder[-3][-2].denselayer16
+def get_transforms(img_size, crop, mean, std):
+    train_transforms = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
 
-    for param in model_last_layer.parameters():
-        param.requires_grad = True
-
-    return model_last_layer
-
-
-## dataset utils
-
-def mean_std(dataset):
-    loader = torch.utils.data.DataLoader(dataset,
-                                            batch_size=1,
-                                            shuffle=False,
-                                            num_workers=0)
-    nimages, mean, std  = 0, 0., 0.
-    print('='*15, f'Calc mean and std','='*15)
-    for batch, _ in tqdm(loader):
-        # Rearrange batch to be the shape of [B, C, W * H]
-        batch = batch.view(batch.size(0), batch.size(1), -1)
-        # Update total number of images
-        nimages += batch.size(0)
-        # Compute mean and std here
-        mean += batch.mean(2).sum(0) 
-        std += batch.std(2).sum(0)
-    mean /= nimages
-    std /= nimages
-    return mean, std
-
-
-def normalize(dataset, mean, std):
-    dataset_norm = []
-    print('='*15, f'Normalizing dataset','='*15)
-    for j in trange(len(dataset)):
-        label = dataset[j][1]
-        img = dataset[j][0]
-        img_norm = (img - mean[0]) / (std[0])
-        dataset_norm.append((img_norm,label))
-    return dataset_norm
-
-
-def split_train_val(size_train, dataset):
-    train_size = int(size_train * len(dataset))
-    test_size = len(dataset) - train_size
-    return torch.utils.data.random_split(dataset, [train_size,test_size])
-
-## seed utils
-
+    test_transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.CenterCrop(crop),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+    
+    return train_transforms, test_transform
 
 ## dicom utils
 
@@ -107,35 +69,7 @@ def convert(img, target_type_min, target_type_max, target_type):
 
     return new_img
 
-
-def windowing(img, window_center, window_width, intercept=0, slope=1):
-    # To HU
-    img = (img*slope + intercept)
-    
-    img_min = window_center - window_width//2 #minimum HU level
-    img_max = window_center + window_width//2 #maximum HU level
-    
-    img[img < img_min] = img_min 
-    img[img > img_max] = img_max 
-    
-    #print(f'Img_w MIN {img_min} and MAX {img_max}')
-
-    return img
-
-  
-def windowing_param(data):
-    w_param = [data[('0028','1050')].value, #window center
-                data[('0028','1051')].value] #window width
-                    
-    return to_int(w_param[0]),to_int(w_param[1])
-
-
-def to_int(x):
-    if type(x) == dcm.multival.MultiValue: return int(x[0])
-    else: return int(x)
-
-
-## show utils
+## Visualization utils
 
 
 def show_distribution(dataloader, set, path_plot):
@@ -215,7 +149,7 @@ def save_roc_curve(true_labels, max_probs, path_plot):
     plt.savefig(path_plot  + 'roc.png')
     plt.close()
 
-## cross validation utils
+## Visualization - cross validation utils
 
 def save_losses_fold(train_losses, test_losses, best_test_acc, fold, path_plot):
     plt.figure(figsize=(16, 8))
@@ -268,3 +202,12 @@ def show_distribution_fold(dataloader, set, fold, path_plot):
     plt.savefig(path_plot + str(set) + '_fold' + str(fold) + '.png')
     plt.close()
     print(f'For {set} Labels {count_labels}')
+
+
+def save_metric_fold(train, test, metric, fold, path_plot):
+    plt.figure(figsize=(16, 8))
+    plt.plot(train, label='Train ' + str(metric))
+    plt.plot(test, label='Test ' + str(metric))
+    plt.legend()
+    plt.savefig(path_plot + str(metric) + 'fold_' + str(fold) + '_.png')
+    plt.close()
