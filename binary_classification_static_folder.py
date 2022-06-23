@@ -1,16 +1,14 @@
 import torch
 import dataset
 import copy
-import random
-import os
 import itertools
+import torch.nn.functional as F
 
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from utils import *
 from model import *
 from torch.optim.lr_scheduler import StepLR
-import torchvision.transforms as transforms
-import torch.nn.functional as F
+from utils_model import *
 
 SIZE_IMAGE = 1024
 PATH_PLOT = '/home/fiodice/project/plot_training/'

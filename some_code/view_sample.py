@@ -7,36 +7,30 @@ import matplotlib.pyplot as plt
 from pydicom.pixel_data_handlers.util import apply_modality_lut, apply_windowing, convert_color_space
 from PIL.Image import fromarray
 
-slope = ('0028','1053')     
-intercept = ('0028','1052') 
-
 if __name__ == '__main__':
-    # EVN 
-    # print(sys.prefix)
-    path_dicom = "/home/fiodice/project/data_only_new/"
-    # # # Doppia radiografia frontale: 326, 439
-
-    # # # File of dicom image
-    DCM_files = []
-    for dir_name, sub_dir_list, file_list in os.walk(path_dicom):
-         for filename in file_list:
-             if ".dcm" in filename.lower():
-                 DCM_files.append(os.path.join(dir_name, filename))
-    print("Number of (.dcm) files =", len(DCM_files))
-
+    # CAC = 0
+    path_img1 = "/home/fiodice/project/dataset/CAC_400/rx/IM-0001-0001.dcm"
+    path_img2 = "/home/fiodice/project/dataset/CAC_404/rx/IM-0008-0001-0002.dcm"
     plot_dir = '/home/fiodice/project/plot_training/'
+
+    DCM_files = []
+
+    img1 = dcmread(path_img1)
+    img2 = dcmread(path_img2)
+
+    f = plt.figure()
+    ax1 = f.add_subplot(1, 2, 1)
+    ax1.title.set_text('CAC score = 0')
+    ax1.grid(False)
+    plt.imshow(img1.pixel_array, cmap=plt.cm.gray)       
+    plt.axis('off')
+
+    ax1 = f.add_subplot(1, 2, 2)
+    ax1.title.set_text('CAC score = 5824')
+    ax1.grid(False)
+    plt.imshow(img2.pixel_array, cmap=plt.cm.gray)
+    plt.tight_layout()
+    plt.axis('off')
+
+    plt.savefig(plot_dir + 'sample_xray.png')
     
-    for index, image_path in enumerate(DCM_files):
-
-        img = dcmread(image_path)
-            #hu = apply_modality_lut(img.pixel_array, img)  
-            #window = apply_windowing(hu, img)
-
-        f = plt.figure()
-
-        ax1 = f.add_subplot(1, 1, 1)
-        ax1.title.set_text('Normal')
-        ax1.grid(False)
-        plt.imshow(img.pixel_array)
-        plt.tight_layout()
-        plt.savefig(plot_dir + str(index) + '.png')

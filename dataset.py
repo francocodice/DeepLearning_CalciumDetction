@@ -16,30 +16,6 @@ from skimage import exposure
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
 
-def norm():
-    pass
-
-
-def get_transforms(img_size, crop, mean, std):
-    train_transforms = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        #transforms.RandomRotation(degrees=15),
-        #transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-
-    test_transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        transforms.CenterCrop(crop),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
-    
-    return train_transforms, test_transform
-
-
 def get_patient_id(dimg):
     #if dimg.PatientID == 'CAC_097':
     #    return 'CAC_097'
@@ -119,8 +95,8 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
 
         # Process label                
         cac_score = [label for label in self.labels if label['id'] == get_patient_id(dimg)][0]['cac_score']
-        cac_clip = np.clip([cac_score],a_min=0, a_max=2000)
-        log_cac_score = np.log(cac_clip + 1)[0] 
+        #cac_clip = np.clip([cac_score],a_min=0, a_max=2000)
+        #log_cac_score = np.log(cac_clip + 1)[0] 
         #cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 1))
         #cac_norm = norm_log(cac_log)[0]
 
@@ -129,7 +105,7 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
         else:
             img = torchvision.transforms.ToTensor()(img)
 
-        return img.float(), log_cac_score 
+        return img.float(), cac_score 
 
 
 

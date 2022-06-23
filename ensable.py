@@ -4,6 +4,7 @@ import numpy as np
 
 from utils import *
 from model import *
+from tqdm import tqdm
 from utils_model import *
 
 PATH_MODELS = '/home/fiodice/project/cac_models/test/'

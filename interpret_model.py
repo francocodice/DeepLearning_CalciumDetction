@@ -9,12 +9,7 @@ import model
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 
-from torchvision import models
-from torchvision import transforms
-
 from captum.attr import IntegratedGradients
-from captum.attr import GradientShap
-from captum.attr import Occlusion
 from captum.attr import NoiseTunnel
 from captum.attr import visualization as viz
 

@@ -54,7 +54,7 @@ def load_densenet_mlp(path_model):
 
     model.fc =  torch.nn.Sequential(
             torch.nn.Linear(1024, 64),
-            torch.nn.Dropout(p=0.4),
+            #torch.nn.Dropout(p=0.4),
             torch.nn.ReLU(),
             torch.nn.Linear(64, 2))
 
@@ -77,7 +77,7 @@ def load_resnet_mlp(path_model):
 
     model.fc =  torch.nn.Sequential(
             torch.nn.Linear(512, 64),
-            torch.nn.Dropout(p=0.4),
+            #torch.nn.Dropout(p=0.4),
             torch.nn.ReLU(),
             torch.nn.Linear(64, 2))
 
@@ -101,7 +101,7 @@ def load_effcientNet(path_model):
     model.fc =  torch.nn.Sequential(
             torch.nn.Linear(1280, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(64, 2))
+            torch.nn.Linear(64, 1))
 
     for param in model.fc.parameters():
         param.requires_grad = True
@@ -109,7 +109,7 @@ def load_effcientNet(path_model):
     return model
 
 
-def load_densenet_mse(path_model):
+def load_densenet_bck(path_model):
     model = HierarchicalResidual(encoder='densenet121')
     dict_model = torch.load(path_model)["model"]
     model.load_state_dict(dict_model)
@@ -124,6 +124,8 @@ def load_densenet_mse(path_model):
             torch.nn.Linear(1024, 64),
             torch.nn.ReLU(),
             torch.nn.Linear(64, 1))
+    
+    print(model)
 
     for param in model.fc.parameters():
         param.requires_grad = True
@@ -133,7 +135,9 @@ def load_densenet_mse(path_model):
 
 ## unfreeze last layer backbone
 
-def activate_denselayer16(model):
+def unfreeze_param_lastlayer_dense(model):
+    #model_last_layer = model.encoder[-2][-2].denselayer16
+    # if remove avgpool
     model_last_layer = model.encoder[-3][-2].denselayer16
 
     for param in model_last_layer.parameters():
@@ -141,9 +145,38 @@ def activate_denselayer16(model):
 
     return model_last_layer
 
+def unfreeze_param_lastlayer_dense_V2(model):
+    model_last_layer = model.encoder[-2][-2].denselayer16
 
-def activate_lastlayer_eff(model):
-    model_last_layer = list(model.encoder.children())[-2]
+    for param in model_last_layer.parameters():
+        param.requires_grad = True
+
+    return model_last_layer
+
+
+def unfreeze_param_last2layer_dense(model):
+    model_lastblock_layer16 = model.encoder[-3][-2].denselayer16
+    model_lastblock_layer15 = model.encoder[-3][-2].denselayer15
+
+    for param in model_lastblock_layer16.parameters():
+        param.requires_grad = True
+
+    for param in model_lastblock_layer15.parameters():
+        param.requires_grad = True
+
+    return model_lastblock_layer16, model_lastblock_layer15
+
+
+def unfreeze_param_lastlayer_eff(model):
+    #print(model)
+    #model_last_layer = list(model.encoder.children())[-2]
+    # 1 363 049
+    model_last_layer = list(model.encoder.children())[-5]
+    print(model_last_layer)
+
+    for i, layer in enumerate((list(model.encoder.children()))):
+        print(f'For {i} layer {layer}')
+
     for param in model_last_layer.parameters():
         param.requires_grad = True
 

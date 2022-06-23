@@ -1,8 +1,6 @@
 import torch
 import torchvision
 from efficientnet_pytorch import EfficientNet
-import torch.nn as nn
-from collections import OrderedDict
 
 
 class HierarchicalResidual(torch.nn.Module):
@@ -80,136 +78,9 @@ class HierarchicalResidual(torch.nn.Module):
             x = self.encoder(x)
 
         # correction from original code here
-        x = torch.flatten(x, 1)
+        #x = torch.flatten(x, 1)
+        print(x.size())
         x = self.fc(x)
 
         return x
-
-
-def load_densenet(path_model):
-    model = HierarchicalResidual(encoder='densenet121')
-    dict_model = torch.load(path_model)["model"]
-    model.load_state_dict(dict_model)
-
-    del model.fc1
-    del model.fc2
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    model.fc = nn.Linear(1024, 2)
-
-    for param in model.fc.parameters():
-        param.requires_grad = True
-    
-    return model
-
-
-
-def test_calcium_det(path_model):
-    model = HierarchicalResidual(encoder='densenet121')
-    dict_model = torch.load(path_model)["model"]
-
-    del model.fc1
-    del model.fc2
-
-    model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(1024, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 2))
-        
-    model.load_state_dict(dict_model)
-
-    return model
-
-
-def load_densenet_mlp(path_model):
-    model = HierarchicalResidual(encoder='densenet121')
-    dict_model = torch.load(path_model)["model"]
-    model.load_state_dict(dict_model)
-
-    del model.fc1
-    del model.fc2
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(1024, 64),
-            torch.nn.Dropout(p=0.4),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 2))
-
-    for param in model.fc.parameters():
-        param.requires_grad = True
-    
-    return model
-
-
-def load_resnet_mlp(path_model):
-    model = HierarchicalResidual(encoder='resnet18')
-    dict_model = torch.load(path_model)["model"]
-    model.load_state_dict(dict_model)
-
-    del model.fc1
-    del model.fc2
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(512, 64),
-            torch.nn.Dropout(p=0.4),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 2))
-
-    for param in model.fc.parameters():
-        param.requires_grad = True
-    
-    return model
-
-
-def load_effcientNet(path_model):
-    model = HierarchicalResidual(encoder='efficientnet-b0')
-    dict_model = torch.load(path_model)["model"]
-    model.load_state_dict(dict_model)
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    del model.fc1
-    del model.fc2
-
-    model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(1280, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 2))
-
-    for param in model.fc.parameters():
-        param.requires_grad = True
-    
-    return model
-
-
-def load_densenet_mse(path_model):
-    model = HierarchicalResidual(encoder='densenet121')
-    dict_model = torch.load(path_model)["model"]
-    model.load_state_dict(dict_model)
-
-    del model.fc1
-    del model.fc2
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    model.fc =  torch.nn.Sequential(
-            torch.nn.Linear(1024, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 1))
-
-    for param in model.fc.parameters():
-        param.requires_grad = True
-    
-    return model
-
 

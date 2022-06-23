@@ -12,6 +12,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 from utils import *
 from model import *
+from utils_model import *
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
