@@ -125,7 +125,6 @@ def load_densenet_bck(path_model):
             torch.nn.ReLU(),
             torch.nn.Linear(64, 1))
     
-    print(model)
 
     for param in model.fc.parameters():
         param.requires_grad = True
@@ -136,17 +135,9 @@ def load_densenet_bck(path_model):
 ## unfreeze last layer backbone
 
 def unfreeze_param_lastlayer_dense(model):
-    #model_last_layer = model.encoder[-2][-2].denselayer16
-    # if remove avgpool
     model_last_layer = model.encoder[-3][-2].denselayer16
-
-    for param in model_last_layer.parameters():
-        param.requires_grad = True
-
-    return model_last_layer
-
-def unfreeze_param_lastlayer_dense_V2(model):
-    model_last_layer = model.encoder[-2][-2].denselayer16
+    # adding dropout
+    #model_last_layer = model.encoder[-4][-2].denselayer16
 
     for param in model_last_layer.parameters():
         param.requires_grad = True
@@ -168,11 +159,7 @@ def unfreeze_param_last2layer_dense(model):
 
 
 def unfreeze_param_lastlayer_eff(model):
-    #print(model)
-    #model_last_layer = list(model.encoder.children())[-2]
-    # 1 363 049
     model_last_layer = list(model.encoder.children())[-5]
-    print(model_last_layer)
 
     for i, layer in enumerate((list(model.encoder.children()))):
         print(f'For {i} layer {layer}')

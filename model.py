@@ -33,7 +33,8 @@ class HierarchicalResidual(torch.nn.Module):
             self.encoder = torch.nn.Sequential(
                 self.encoder.features,
                 torch.nn.ReLU(inplace=True),
-                torch.nn.AdaptiveAvgPool2d((1, 1))
+                #torch.nn.Dropout2d(p=0.25),
+                torch.nn.AdaptiveAvgPool2d((1, 1)),
             )
 
         elif 'efficientnet' in encoder:
@@ -78,8 +79,7 @@ class HierarchicalResidual(torch.nn.Module):
             x = self.encoder(x)
 
         # correction from original code here
-        #x = torch.flatten(x, 1)
-        print(x.size())
+        x = torch.flatten(x, 1)
         x = self.fc(x)
 
         return x

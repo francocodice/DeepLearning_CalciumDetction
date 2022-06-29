@@ -67,8 +67,8 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/labels/labels_new.db'
-    #path_model = '/home/fiodice/project/src/pretrained_model/dense_final.pt'
-    path_model = '/home/fiodice/project/src/pretrained_model/eff_best.pt'
+    path_model = '/home/fiodice/project/src/pretrained_model/dense_final.pt'
+    #path_model = '/home/fiodice/project/src/pretrained_model/eff_best.pt'
 
     seed = 42
     k_folds = 5
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     set_seed(seed)
 
-    accs, b_accs = {}, {}
+    accs, b_accs = [], []
     mean, std = [0.5024], [0.2898]
 
     transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
@@ -108,9 +108,9 @@ if __name__ == '__main__':
         #show_distribution_fold(train_loader, 'train', fold, PATH_PLOT)
         #show_distribution_fold(test_loader, 'test', fold, PATH_PLOT)
         
-        model = load_effcientNet(path_model)
+        model = load_densenet_mlp(path_model)
         model.to(device)
-        last_layer = activate_lastlayer_eff(model)
+        last_layer = unfreeze_param_lastlayer_dense(model)
 
         best_model = None
         best_test_acc, best_test_bacc = 0., 0.
@@ -129,7 +129,7 @@ if __name__ == '__main__':
         print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
         
         #scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
-        scheduler = MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
+        scheduler = MultiStepLR(optimizer, milestones=[30, 60], gamma=0.1)
         
         train_losses, test_losses = [], []
 
@@ -163,25 +163,24 @@ if __name__ == '__main__':
 
         print('--------------------------------')
         
-        b_accs[fold] = 100.0 * best_test_bacc
-        accs[fold] = 100.0 * best_test_acc
+        b_accs.append(100.0 * best_test_bacc)
+        accs.append(100.0 * best_test_acc.cpu().numpy())
+
         save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
 
     # Print fold results
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
     print('--------------------------------')
     
-    sum = 0.0
-    for key, value in accs.items():
-        print(f'Fold {key}: {value} %')
-        sum += value
+    b_accs = np.array(b_accs)
+    accs = np.array(accs)
 
-    print(f'ACC Average: {sum/len(accs.items())} %')
+    for fold, value in enumerate(accs):
+        print(f'Fold {fold}: {value} %')
+    print(f'ACC Average: {accs.mean()} % STD : {accs.std()}')
     print()
 
-    sum = 0.0
-    for key, value in b_accs.items():
-        print(f'Fold {key}: {value} %')
-        sum += value
-
-    print(f'B-ACC Average: {sum/len(accs.items())} %')
+    for fold, value in enumerate(b_accs):
+        print(f'Fold {fold}: {value} %')
+    print(f'B-ACC Average: {b_accs.mean()} % STD : {b_accs.std()}')
+    print()

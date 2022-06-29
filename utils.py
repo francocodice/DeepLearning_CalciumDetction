@@ -60,8 +60,6 @@ def dicom_img(path):
 def convert(img, target_type_min, target_type_max, target_type):
     imin = img.min()
     imax = img.max()
-
-    #print(f'Convert method min {imin} max {imax}')
     
     a = (target_type_max - target_type_min) / (imax - imin)
     b = target_type_max - a * imax
@@ -78,8 +76,8 @@ def show_distribution(dataloader, set, path_plot):
     count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
     
     val_samplesize = pd.DataFrame.from_dict(
-    {'[0:100]': [count_labels[0]], 
-     '> 100': count_labels[1],
+    {'[0:10]': [count_labels[0]], 
+     '> 10': count_labels[1],
     })
 
     sns.barplot(data=val_samplesize)
@@ -194,8 +192,8 @@ def show_distribution_fold(dataloader, set, fold, path_plot):
     count_labels = collections.OrderedDict(sorted(collections.Counter(label_flat_list).items()))
     
     val_samplesize = pd.DataFrame.from_dict(
-    {'[0:100]': [count_labels[0]], 
-     '> 100': count_labels[1],
+    {'[0:10]': [count_labels[0]], 
+     '> 10': count_labels[1],
     })
 
     sns.barplot(data=val_samplesize)

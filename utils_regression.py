@@ -9,16 +9,22 @@ MAX_CAC_VAL = 2000
 
 
 def cac_prediction_error(labels, outputs, mean, std, best_pred_labels, true_labels):
-    print(best_pred_labels)
-    print(true_labels)
-    labels = np.exp((labels * std) + mean)
-    outputs = np.exp((outputs * std) + mean)
-    error = []
+    # true_labels -> binary label
+    # labels -> continuos label
+    labels = np.exp((labels * std) + mean - 0.001)
+    outputs = np.exp((outputs * std) + mean - 0.001)
+    total_error, error_on_wrong_sample = [], []
     for i in range(len(labels)): 
-        print(f'For patient {i} .... CAC label : {labels[i]} CAC predicted : {outputs[i]}')
-        error.append(np.abs(outputs[i] - labels[i]))
-    error = np.array(error)
-    print(f'Error Average: {error.mean()} STD : {error.std()}')
+        total_error.append(np.abs(outputs[i] - labels[i]))
+        if (best_pred_labels[i] != true_labels[i]):
+            error_on_wrong_sample.append(np.abs(outputs[i] - labels[i]))
+            print(f'For patient mis classfied {i} .... CAC label : {labels[i]} CAC predicted : {outputs[i]}')
+
+    total_error = np.array(total_error)
+    error_on_wrong_sample = np.array(error_on_wrong_sample)
+    print(f'Total error Average: {total_error.mean()} STD : {total_error.std()}')
+    print(f'Error Average on misclassified sample : {error_on_wrong_sample.mean()} STD : {error_on_wrong_sample.std()}')
+
 
 
 def viz_distr_data(loader, fold, phase):
@@ -67,7 +73,7 @@ def local_copy_str_kfold(dataset):
 
 
 def mean_absolute_error(y_true, y_pred):
-    return np.sum(np.abs(np.array(y_true) - np.array(y_pred)))
+    return np.sum(np.abs(np.array(y_true) - np.array(y_pred)))/len(y_true)
 
 
 def to_class(continuos_values, labels, th):

@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     seed = 42
     k_folds = 5
-    epochs = 10
+    epochs = 80
     batchsize = 4
     mean, std = [0.5024], [0.2898]
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
     whole_dataset = dataset.CalciumDetectionRegression(path_data, path_labels, transform)
-    #whole_dataset = local_copy(whole_dataset)
+    whole_dataset = local_copy(whole_dataset)
     datas, labels = local_copy_str_kfold(whole_dataset)
 
     skf = StratifiedKFold(n_splits= k_folds)
@@ -159,7 +159,7 @@ if __name__ == '__main__':
                 print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
                 save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
         
-        cac_prediction_error(labels, outputs, mean_cac, std_cac, best_pred_labels, true_labels)
+        #cac_prediction_error(labels, outputs, mean_cac, std_cac, best_pred_labels, true_labels)
         #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         save_metric_fold(train_accs, test_accs, 'accs', fold, PATH_PLOT)
         save_metric_fold(trains_abs, tests_abs, 'abs', fold, PATH_PLOT)

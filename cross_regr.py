@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     seed = 42
     k_folds = 5
-    epochs = 80
+    epochs = 100
     batchsize = 4
 
     set_seed(seed)
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
     whole_dataset = dataset.CalciumDetectionRegression(path_data, path_labels, transform)
-    whole_dataset = local_copy(whole_dataset)
+    #whole_dataset = local_copy(whole_dataset)
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
 
@@ -96,13 +96,13 @@ if __name__ == '__main__':
                         batch_size=batchsize, sampler=train_subsampler)
 
         mean_cac, std_cac = mean_std_cac_score_log(train_loader)
-
+        
         test_loader = torch.utils.data.DataLoader(
                         whole_dataset,
                         batch_size=batchsize, sampler=test_subsampler)
 
-        viz_distr_data(train_loader, fold, 'train')
-        viz_distr_data(test_loader, fold, 'test')
+        #viz_distr_data(train_loader, fold, 'train')
+        #viz_distr_data(test_loader, fold, 'test')
         
         model = load_densenet_bck(path_model)
         model.to(device)
