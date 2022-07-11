@@ -29,4 +29,4 @@ Two approaches for solving the task were performed, for both approaches a cross 
 
 ##### Result
 
-The models resulting from the training could be found on `project/src/models_pt/final`. More details on the methodology and quality of the results can be found in the thesis by Francesco Iodice followed by Professor Marco Grangetto and the co-supervisors Alberto Presta and Carlo Alberto Barabano.
+The models resulting from the training could be found on `project/src/models_pt/final`. More details on the methodology and quality of the results can be found in the thesis of Francesco Iodice followed by Professor Marco Grangetto and the co-supervisors Alberto Presta and Carlo Alberto Barbano.
