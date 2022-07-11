@@ -2,32 +2,24 @@ import torch
 import dataset
 import copy
 import itertools
-from tqdm import tqdm, trange
+import sys
+import numpy as np
 
+from tqdm import tqdm, trange
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from collections import Counter
-
 from torch.optim.lr_scheduler import MultiStepLR
 
-from utils import *
-from model import *
-from utils_model import *
+from models import utils_model
+from utility import utils
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
+VISUALIZE = False
+
+sys.path.insert(0, '/home/fiodice/project/src')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
-def local_copy(dataset):
-    data = []
-    print('='*15, f'Copying dataset','='*15)
-    for j in trange(len(dataset)):
-        label = dataset[j][1]
-        img = dataset[j][0]
-        data.append((img,label))
-    return data
-
 
 def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
     epoch_loss, epoch_acc, samples_num = 0., 0., 0.
@@ -67,7 +59,7 @@ def run(model, dataloader, criterion, optimizer, scheduler=None, phase='train'):
 if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/labels/labels_new.db'
-    path_model = '/home/fiodice/project/src/pretrained_model/dense_final.pt'
+    path_model = '/home/fiodice/project/src/models_pt/pretrained_model/dense_final.pt'
     #path_model = '/home/fiodice/project/src/pretrained_model/eff_best.pt'
 
     seed = 42
@@ -75,15 +67,15 @@ if __name__ == '__main__':
     epochs = 80
     batchsize = 4
 
-    set_seed(seed)
+    utils.set_seed(seed)
 
     accs, b_accs = [], []
     mean, std = [0.5024], [0.2898]
 
-    transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
+    transform, _ = utils.get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
     whole_dataset = dataset.CalciumDetection(path_data, path_labels, transform)
-    whole_dataset = local_copy(whole_dataset)
+    whole_dataset = utils.local_copy(whole_dataset)
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
 
@@ -108,9 +100,9 @@ if __name__ == '__main__':
         #show_distribution_fold(train_loader, 'train', fold, PATH_PLOT)
         #show_distribution_fold(test_loader, 'test', fold, PATH_PLOT)
         
-        model = load_densenet_mlp(path_model)
+        model = utils_model.densenet_classifier(path_model)
         model.to(device)
-        last_layer = unfreeze_param_lastlayer_dense(model)
+        last_layer = utils_model.unfreeze_param_lastlayer_dense_clf(model)
 
         best_model = None
         best_test_acc, best_test_bacc = 0., 0.
@@ -154,8 +146,8 @@ if __name__ == '__main__':
 
                 print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f} B-Acc : {balanced_accuracy_score(true_labels, pred_labels):.4f}')
                 print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
-                save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
-                save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
+                utils.save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
+                utils.save_roc_curve_fold(true_labels, y_score, fold, PATH_PLOT)
 
         #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
@@ -166,7 +158,7 @@ if __name__ == '__main__':
         b_accs.append(100.0 * best_test_bacc)
         accs.append(100.0 * best_test_acc.cpu().numpy())
 
-        save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
+        utils.save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
 
     # Print fold results
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')

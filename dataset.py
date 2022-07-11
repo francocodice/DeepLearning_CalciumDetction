@@ -2,27 +2,33 @@ import torch
 from PIL import Image
 import glob
 import os
-import gc
-
 import torchvision
 import pydicom
 import numpy as np
 import sqlite3
-from utils import convert
+
 from pydicom.pixel_data_handlers.util import  apply_windowing, apply_modality_lut
-from utils import *
 from skimage import exposure
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 
-
+## For wrong entry in site.db
 def get_patient_id(dimg):
-    #if dimg.PatientID == 'CAC_097':
-    #    return 'CAC_097'
     if dimg.PatientID == 'CAC_1877':
         return dimg.PatientName
     else:
         return dimg.PatientID
+
+
+def convert(img, target_type_min, target_type_max, target_type):
+    imin = img.min()
+    imax = img.max()
+    
+    a = (target_type_max - target_type_min) / (imax - imin)
+    b = target_type_max - a * imax
+    new_img = (a * img + b).astype(target_type)
+
+    return new_img
 
 
 class CalciumDetection(torch.utils.data.Dataset):
@@ -97,7 +103,7 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
         cac_score = [label for label in self.labels if label['id'] == get_patient_id(dimg)][0]['cac_score']
         #cac_clip = np.clip([cac_score],a_min=0, a_max=2000)
         #log_cac_score = np.log(cac_clip + 1)[0] 
-        #cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 1))
+        #cac_log = np.log((np.clip([cac_score],a_min=0, a_max=2000) + 0.001))
         #cac_norm = norm_log(cac_log)[0]
 
         if self.transform is not None:
@@ -107,38 +113,3 @@ class CalciumDetectionRegression(torch.utils.data.Dataset):
 
         return img.float(), cac_score 
 
-
-
-if __name__ == '__main__':
-
-    gc.collect()
-
-    torch.cuda.empty_cache()
-
-    path_data = '/home/fiodice/project/dataset/'
-    #path_labels = '/home/fiodice/project/dataset/site.db'
-    path_labels =  '/home/fiodice/project/labels/labels_new.db'
-
-    mean, std = [0.5024], [0.2898]
-    train_t, test_t = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
-
-    dataset = CalciumDetection(path_data, path_labels, transform=train_t)
-
-    data_loader = torch.utils.data.DataLoader(dataset,
-                            batch_size = 1,
-                            shuffle = False,
-                            num_workers = 0)
-
-    loaders = [data_loader]
-    scores = []
-
-    for loader in loaders:
-        for batch_idx, (data, labels) in enumerate(loader):
-            scores.append(labels.numpy()[0])
-
-    plt.figure()
-    plt.rcParams.update({'figure.figsize':(7,5), 'figure.dpi':100})
-    plt.hist(scores, bins=5)
-    plt.gca().set(title='Frequency Histogram', ylabel='Calcium score')
-    plt.savefig(PATH_PLOT + 'hist.png')
-    plt.close()

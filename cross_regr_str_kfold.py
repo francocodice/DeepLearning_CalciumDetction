@@ -2,6 +2,8 @@ import torch
 import dataset
 import copy
 import itertools
+import sys
+import numpy as np
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
@@ -9,14 +11,15 @@ from collections import Counter
 from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 
-from utils import *
-from model import *
-from utils_model import *
-from utils_regression import *
+from utility import utils_regression
+from utility import utils
+from models import utils_model
 
+sys.path.insert(0, '/home/fiodice/project/src')
 
 PATH_PLOT = '/home/fiodice/project/plot_training/'
 THRESHOLD_CAC_SCORE = 10
+VISUALIZE_FOLD = False
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -27,7 +30,7 @@ def run(model, dataloader, criterion, optimizer, mean, std, scheduler=None, phas
     all_labels, all_outputs = [], []
     
     for (data, labels) in tqdm(dataloader):
-        labels = pre_process_label(mean, std, labels)
+        labels = utils_regression.pre_process_label(mean, std, labels)
 
         optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
@@ -35,7 +38,7 @@ def run(model, dataloader, criterion, optimizer, mean, std, scheduler=None, phas
             outputs = model(data)
 
             th = (np.log(THRESHOLD_CAC_SCORE + 0.001) - mean) / std
-            output_classes, labels_classes = to_class(outputs.detach().cpu(), labels.detach().cpu(), th)
+            output_classes, labels_classes = utils_regression.to_class(outputs.detach().cpu(), labels.detach().cpu(), th)
 
             loss = criterion(outputs.float(), labels.unsqueeze(dim=1).float()).to(device)
 
@@ -61,7 +64,7 @@ def run(model, dataloader, criterion, optimizer, mean, std, scheduler=None, phas
 if __name__ == '__main__':
     path_data = '/home/fiodice/project/dataset/'
     path_labels = '/home/fiodice/project/labels/labels_new.db'
-    path_model = '/home/fiodice/project/src/pretrained_model/dense_final.pt'
+    path_model = '/home/fiodice/project/src/models_pt/pretrained_model/dense_final.pt'
 
     accs, b_accs = [], []
 
@@ -71,12 +74,12 @@ if __name__ == '__main__':
     batchsize = 4
     mean, std = [0.5024], [0.2898]
 
-    set_seed(seed)
-    transform, _ = get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
+    utils.set_seed(seed)
+    transform, _ = utils.get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
     whole_dataset = dataset.CalciumDetectionRegression(path_data, path_labels, transform)
-    whole_dataset = local_copy(whole_dataset)
-    datas, labels = local_copy_str_kfold(whole_dataset)
+    whole_dataset = utils.local_copy(whole_dataset)
+    datas, labels = utils_regression.local_copy_str_kfold(whole_dataset)
 
     skf = StratifiedKFold(n_splits= k_folds)
     criterion = torch.nn.MSELoss()
@@ -94,19 +97,20 @@ if __name__ == '__main__':
                         whole_dataset, 
                         batch_size=batchsize, sampler=train_subsampler)
 
-        mean_cac, std_cac = mean_std_cac_score_log(train_loader)
+        mean_cac, std_cac = utils_regression.mean_std_cac_score_log(train_loader)
 
         test_loader = torch.utils.data.DataLoader(
                         whole_dataset,
                         batch_size=batchsize, sampler=test_subsampler)
 
-        #viz_distr_data(train_loader, fold, 'train')
-        #viz_distr_data(test_loader, fold, 'test')
+        if VISUALIZE_FOLD:
+            utils_regression.viz_distr_data(train_loader, fold, 'train')
+            utils_regression.viz_distr_data(test_loader, fold, 'test')
         
-        model = load_densenet_bck(path_model)
+        model = utils_model.densenet_regressor(path_model)
 
         model.to(device)
-        model_last_layer = unfreeze_param_lastlayer_dense(model)
+        model_last_layer = utils_model.unfreeze_param_lastlayer_dense_regr(model)
 
         best_model = None
         best_test_acc, best_test_bacc = 0., 0.
@@ -127,16 +131,15 @@ if __name__ == '__main__':
         train_losses, test_losses = [], []
         train_accs, test_accs = [],[]
         trains_abs, tests_abs = [], []
-        f_labels, f_outputs = [], []
+        f_outputs = []
 
         print(f'Pytorch trainable param {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
 
         for epoch in range(1, epochs+1):
             print('\n','='*20, f'Epoch: {epoch}','='*20,'\n')
 
-            train_loss, train_acc, _, _, labels_train, outputs_train = run(model, train_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler)
-            test_loss, test_acc, true_labels, pred_labels, labels, outputs = run(model, test_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler, phase='test')
-
+            train_loss, train_acc, _, _, _, _ = run(model, train_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler)
+            test_loss, test_acc, class_labels, class_preds, labels, outputs = run(model, test_loader, criterion, optimizer, mean=mean_cac, std=std_cac, scheduler=scheduler, phase='test')
 
             print(f'\nTrain loss: {train_loss:.4f}, Train accuracy: {train_acc:.4f}')
             print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}\n')
@@ -145,24 +148,22 @@ if __name__ == '__main__':
             test_losses.append(test_loss)
             train_accs.append(train_acc)
             test_accs.append(test_acc)
-            trains_abs.append(mean_absolute_error(labels_train, outputs_train))
-            tests_abs.append(mean_absolute_error(labels, outputs))
 
             if best_model is None or (test_acc > best_test_acc):
                 best_model = copy.deepcopy(model)
-                best_test_bacc = balanced_accuracy_score(true_labels, pred_labels)
+                best_test_bacc = balanced_accuracy_score(class_labels, class_preds)
                 best_test_acc = test_acc 
-                best_pred_labels = pred_labels 
-                f_labels, f_outputs = labels, outputs
+                best_pred_labels = class_preds 
+                f_outputs = outputs
 
-                print(f'Model UPDATE Acc: {accuracy_score(true_labels, pred_labels):.4f} B-Acc : {balanced_accuracy_score(true_labels, pred_labels):.4f}')
-                print(f'Labels {Counter(true_labels)} Output {Counter(best_pred_labels)}')
-                save_cm_fold(true_labels, best_pred_labels, fold, PATH_PLOT)
+                print(f'Model UPDATE Acc: {accuracy_score(class_labels, class_preds):.4f} B-Acc : {balanced_accuracy_score(class_labels, class_preds):.4f}')
+                print(f'Labels {Counter(class_labels)} Output {Counter(best_pred_labels)}')
+                utils.save_cm_fold(class_labels, best_pred_labels, fold, PATH_PLOT)
         
-        #cac_prediction_error(labels, outputs, mean_cac, std_cac, best_pred_labels, true_labels)
-        #torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
-        save_metric_fold(train_accs, test_accs, 'accs', fold, PATH_PLOT)
-        save_metric_fold(trains_abs, tests_abs, 'abs', fold, PATH_PLOT)
+        utils_regression.cac_prediction_error(labels, f_outputs, mean_cac, std_cac, fold)
+        torch.save({'model': best_model.state_dict()}, f'calcium-detection-sdg-seed-{seed}-fold-{fold}.pt')
+        utils.save_metric_fold(train_accs, test_accs, 'accs', fold, PATH_PLOT)
+        utils.save_metric_fold(trains_abs, tests_abs, 'abs', fold, PATH_PLOT)
         print('Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_acc))
         print('B-Accuracy for fold %d: %d %%' % (fold, 100.0 * best_test_bacc))
 
@@ -170,7 +171,7 @@ if __name__ == '__main__':
         
         b_accs.append(100.0 * best_test_bacc)
         accs.append(100.0 * best_test_acc)
-        save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
+        utils.save_losses_fold(train_losses, test_losses, best_test_acc, fold, PATH_PLOT)
 
     # Print fold results
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
