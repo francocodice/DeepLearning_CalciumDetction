@@ -136,6 +136,22 @@ def densenet_regressor(path_model):
     return model
 
 
+def test_densenet_regressor(path_model):
+    model = model_HR.HierarchicalResidual(encoder='densenet121')
+    dict_model = torch.load(path_model)["model"]
+
+    del model.fc1
+    del model.fc2
+
+    model.fc =  torch.nn.Sequential(
+            torch.nn.Linear(1024, 64),
+            torch.nn.ReLU(),
+            torch.nn.Linear(64, 1))
+    
+    model.load_state_dict(dict_model)
+    return model
+
+
 ## unfreeze last layer backbone
 
 def unfreeze_param_lastlayer_dense_regr(model):

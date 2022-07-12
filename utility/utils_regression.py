@@ -6,42 +6,78 @@ PATH_PLOT = '/home/fiodice/project/plot_training/'
 MAX_CAC_VAL = 2000
 
 
-def cac_prediction_error(labels, outputs, mean, std, fold):
-    # true_labels -> binary label
-    # labels -> continuos label
+def cac_prediction_error_bin(labels, preds, mean, std, fold, size_bin):
     labels = np.exp((labels * std) + mean - 0.001).flatten()
-    outputs = np.exp((outputs * std) + mean - 0.001).flatten()
+    preds = np.exp((preds * std) + mean - 0.001).flatten()
+    #labels = np.clip(labels,a_min=0, a_max=2000).flatten()
+    #preds = np.clip(preds,a_min=0, a_max=2000).flatten()
+
+    preds_and_labels = list(np.array((preds,labels)).T)
+    preds_and_labels.sort(key=lambda pred: pred[0])
+
+    bins, error_bins = [], []
+    error_bin = 0
+    for index, (prediction, label) in enumerate(preds_and_labels):
+        if index == 0:
+            bins.append(prediction)
+
+        error_bin += np.abs(label - prediction)
+
+        if index % size_bin == 0 and index != 0:
+            bins.append(prediction)
+            error_bins.append(error_bin)
+            error_bin = 0
+
+    plt.figure(figsize=(18, 10))
+    plt.xlabel("Error on bin")
+    plt.ylabel("Calcium predicted")
+    plt.hist(error_bins, bins=bins)
+
+    plt.show()
+    plt.savefig(PATH_PLOT  + 'bin.png')
+
+
+def cac_prediction_error(labels, preds, mean, std, fold, viz, max_val, log_scale):
+    th = 10
+    if log_scale:
+        labels = ((labels * std) + mean - 0.001).flatten()
+        preds = ((preds * std) + mean - 0.001).flatten()
+        th = (np.log(th + 0.001) - mean) / std
+    else:
+        labels = np.exp((labels * std) + mean - 0.001).flatten()
+        preds = np.exp((preds * std) + mean - 0.001).flatten()
+        labels = np.clip(labels,a_min=0, a_max=max_val).flatten()
+        preds = np.clip(preds,a_min=0, a_max=max_val).flatten()
+
+    preds_and_labels = list(np.array((preds,labels)).T)
+    preds_and_labels.sort(key=lambda pred: pred[0])
+
     top_error, bottom_error = [], []
-    print(f'Labels Min {labels.min()} max  {labels.max()}')
-    print(f'Outputs Min {outputs.min()} max  {outputs.max()}')
+    for prediction, label in preds_and_labels:
+        err = label - prediction
+        top_error.append(err)
+        bottom_error.append(0)
 
-    for i in range(len(labels)):
-        err_i = outputs[i] - labels[i]
-        if err_i < 0:
-            top_error.append(0)
-            bottom_error.append(err_i)
-        else:
-            bottom_error.append(0)
-            top_error.append(err_i)
+    if viz:
+        preds_sort, labels_sort = zip(*preds_and_labels)
+        plt.figure(figsize=(16, 8))
+        plt.plot(labels_sort, label='Labels')
+        plt.plot(preds_sort, label='Preds')
+        plt.legend()
+        plt.xlabel("Samples")
+        plt.ylabel("Calcium score predicted")
+        plt.savefig(PATH_PLOT  + 'error_all_cac_fold' + str(fold) + '.png')
+        plt.close()
 
-    #for i in range(len(labels)): 
-    #    total_error.append(np.abs(outputs[i] - labels[i]))
-    #    if (best_pred_labels[i] != true_labels[i]):
-    #        error_on_wrong_sample.append(np.abs(outputs[i] - labels[i]))
-            #print(f'For patient mis classfied {i} .... CAC label : ({labels[i]}, {true_labels[i]}) CAC predicted : ({outputs[i]},{best_pred_labels[i]})')
-        #else:
-            #print(f'For patient correct classfied {i} .... CAC label : ({labels[i]}, {true_labels[i]}) CAC predicted : ({outputs[i]},{best_pred_labels[i]})')
-
-    #print(f'Total error Average: {total_error.mean()} STD : {total_error.std()}')
-    #print(f'Error Average on misclassified sample : {error_on_wrong_sample.mean()} STD : {error_on_wrong_sample.std()}')
-
-    plt.figure(figsize=(16, 10))
+    plt.figure(figsize=(18, 10))
     plt.xlabel("Samples")
     plt.ylabel("Calcium score predicted")
     plt.grid()
+    plt.axhline(y = th, color = 'r', label = "Threshold")
+
     plt.errorbar(x = np.arange(start=0, stop=len(labels)), 
-                 y=outputs, 
-                 yerr=[bottom_error, top_error], fmt='v')
+                 y = np.sort(preds), 
+                 yerr=[bottom_error, top_error], fmt='o')
     plt.show()
     plt.savefig(PATH_PLOT  + 'error_cac_fold' + str(fold) + '.png')
     plt.close()
@@ -95,3 +131,22 @@ def to_class(continuos_values, labels, th):
     classes_labels = [0 if labels[i] <= th else 1 for i in range(labels.size(dim=0))]
     output_labels = [0 if continuos_values[i] <= th else 1 for i in range(continuos_values.size(dim=0))]
     return torch.tensor(output_labels), torch.tensor(classes_labels)
+
+
+
+if __name__ == '__main__':
+    #y = np.array([218, 280, 233, 300, 228, 239]) 
+    #x = np.array([102, 90,   90,  20,  0,  0])
+
+    #cac_prediction_error_bin(x,y,1,1,9,2)
+    bins = np.array([ 0, 2, 5, 10, 400,1000,2000])
+    x = np.array([ 0, 10, 20, 30, 40, 50, 70,90,0,1000,1000,1000,1001])
+    w = np.array([ 8, 12, 24, 26, 30, 40, 60])
+
+    plt.figure(figsize=(18, 10))
+    plt.xlabel("Error on bin")
+    plt.ylabel("Calcium predicted")
+    plt.hist(x, bins=bins, weights=w)
+
+    plt.show()
+    plt.savefig(PATH_PLOT  + 'bin2.png')
