@@ -81,6 +81,7 @@ parser.add_argument('--loss', type=str, default='MAE', help='loss function (MSE 
 #parser.add_argument('--layer_enc_freeze', type=bool, default=True, help='unfreeze last layer encoder for training')
 
 args = parser.parse_args()
+utils.set_seed(seed)
 
 lr = args.lr
 encoder_name = args.arch
@@ -119,7 +120,6 @@ else:
     print(f'Unkown loss value: {loss}')
     exit(1)
 
-utils.set_seed(seed)
 transform, _ = utils.get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
 whole_dataset = dataset.CalciumDetection(path_data, transform, mode='regression')

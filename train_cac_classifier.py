@@ -73,6 +73,7 @@ parser.add_argument('--momentum', type=float, default=0.9, help='momentum value 
 parser.add_argument('--kfold', type=int, default=5, help='folds for cross-validation (default 5)')
 
 args = parser.parse_args()
+utils.set_seed(seed)
 
 lr = args.lr
 encoder_name = args.arch
@@ -101,7 +102,6 @@ else:
     print(f'Unkown encoder_name value: {encoder_name}')
     exit(1)
 
-utils.set_seed(seed)
 transform, _ = utils.get_transforms(img_size=1248, crop=1024, mean = mean, std = std)
 
 whole_dataset = dataset.CalciumDetection(path_data, transform, mode='classification', require_cac_score=True)
