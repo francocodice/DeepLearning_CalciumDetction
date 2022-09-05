@@ -8,25 +8,29 @@ Through this work we aim to build a process, based on convolutional neural netwo
 
 ### Data
 
-For the correct functioning of the code shown in this repo it is necessary to work with the folder `/home/fiodice/project/dataset` in escher.
-The code in `project/src/some_code/clean_dataset.py` is a script for cleaning the dataset, but many labels of the dicom files are not populated. The script removes most of the useless files, but a manual cleanup was performed for the rest.
+For the correct functioning of the code shown in this repo it is necessary to work with the dataset content in the folder `/home/fiodice/project/dataset`.
+The code in `script_clean_data/clean_dataset.py` is a script for cleaning the dataset, but many labels of the dicom files are not populated. The script removes most of the useless files, but a manual cleanup was performed for the rest.
 
 ### Training
 
-Two approaches for solving the task were performed, for both approaches a cross validation with 5 fold was performed. For the files that I am going to list you can specify: 
+Two approaches were performed for solving the task, for both approaches a cross validation with 5 fold was performed. 
 
-- `path_data` : path to folder with the data
-- `path_labels` : path to labels
-- `path_model` : path to pretrained model
+-  In `train_cac_classifier` the classification approach is implemented
+-  In `train_cac_regressor.py` the regressor approach is implemented
 
-##### Classification
-- In `cross_clf` the classification approach is implemented
+For the files you can specify the following parameters: 
 
-##### Regression
+- `epochs` : num. of epochs (default 50)
+- `lr` : learning rate default (3e-4) for classification and (1e-3) for regression
+- `arch` : encoder architecture (densenet121 or resnet18 or efficientNet)
+- `viz` : save images of metrics and losses
+- `save` : save model
+- `wd` : weight decay value (default 1e-4)
+- `batchsize` : save images of metrics and losses
+- `momentum` : momentum value (default 0.9)
+- `kfold` : folds for cross-validation (default 5)
 
--  In `cross_regr.py` the regression approach is implemented 
--  In `cross_regr_str_kfold.py` is implemented a cross-validation stratified
 
 ##### Result
 
-The models resulting from the training could be found on `project/src/models_pt/final`. More details on the methodology and quality of the results can be found in the thesis of Francesco Iodice followed by Professor Marco Grangetto and the co-supervisors Alberto Presta and Carlo Alberto Barbano.
+The best models resulting with the relevant training details, could be found in the result `models_cac_pt`. More details on the methodology and quality of the results can be found in the thesis of Francesco Iodice followed by Professor Marco Grangetto and the co-supervisors Alberto Presta and Carlo Alberto Barbano.
