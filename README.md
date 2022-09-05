@@ -15,8 +15,8 @@ The code in `script_clean_data/clean_dataset.py` is a script for cleaning the da
 
 Two approaches were performed for solving the task, for both approaches a cross validation with 5 fold was performed. 
 
--  In `train_cac_classifier` the classification approach is implemented
--  In `train_cac_regressor.py` the regressor approach is implemented
+-  In `train_cac_classifier.py` the classification approach is implemented
+-  In `train_cac_regressor.py` the regression approach is implemented
 
 For the files you can specify the following parameters: 
 
