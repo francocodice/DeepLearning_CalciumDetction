@@ -26,7 +26,7 @@ For the files you can specify the following parameters:
 - `viz` : save images of metrics and losses
 - `save` : save model
 - `wd` : weight decay value (default 1e-4)
-- `batchsize` : save images of metrics and losses
+- `batchsize` : samples for batch 
 - `momentum` : momentum value (default 0.9)
 - `kfold` : folds for cross-validation (default 5)
 

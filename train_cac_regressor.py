@@ -22,7 +22,7 @@ from utility.visualize import *
 from utility.config import base_path, seed, TH_cac_score
 
 sys.path.insert(0, base_path + '/src')
-plt.rc('font', size=13) 
+plt.rc('font', size=15) 
 
 def run(model, dataloader, criterion, optimizer, mean, std, scheduler=None, phase='train'):
     epoch_loss, epoch_acc, samples_num = 0., 0., 0.

@@ -1,7 +1,6 @@
 import torch
 import glob
 import os
-import torchvision
 import pydicom
 import numpy as np
 import sqlite3

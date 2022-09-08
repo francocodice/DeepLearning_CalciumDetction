@@ -1,17 +1,8 @@
-from pip import main
 import torch
-import collections
 import random 
 import os
-
 import numpy as np
-import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
-import seaborn as sns
-import pandas as pd 
-
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_curve, auc
 
 
 def set_seed(seed):
@@ -40,7 +31,6 @@ def get_transforms(img_size, crop, mean, std):
     ])
     
     return train_transforms, test_transform
-
 
 
 def local_copy(dataset, require_cac_score):
